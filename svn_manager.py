@@ -336,7 +336,8 @@ class SVNManager:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                cwd=self.working_copy_path
             )
 
             if result.returncode != 0:
