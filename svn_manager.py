@@ -478,13 +478,14 @@ class SVNManager:
             print(f"Error parsing XML: {e}")
             return []
 
-    def format_changelog(self, logs: List[Dict], format_type: str = 'plain') -> str:
+    def format_changelog(self, logs: List[Dict], format_type: str = 'plain', truncate_messages: bool = True) -> str:
         """
         Format changelog in various formats.
 
         Args:
             logs: List of log entries
-            format_type: 'plain', 'markdown', or 'commit'
+            format_type: 'plain', 'markdown', 'commit', or 'tortoise'
+            truncate_messages: For TortoiseSVN format, truncate messages to first line or 240 chars
 
         Returns:
             Formatted changelog string
@@ -504,6 +505,27 @@ class SVNManager:
             output = "Changes:\n"
             for log in logs:
                 output += f"- r{log['revision']}: {log['message'].split(chr(10))[0]}\n"
+            return output
+
+        elif format_type == 'tortoise':
+            # TortoiseSVN-style format (newest first)
+            output = ""
+            for log in reversed(logs):
+                message = log['message']
+
+                # Truncate message if enabled (first line or 240 chars, whichever is shorter)
+                if truncate_messages:
+                    # Get first line
+                    first_line = message.split('\n')[0]
+                    # Truncate to 240 chars if longer
+                    if len(first_line) > 240:
+                        message = first_line[:240] + "..."
+                    else:
+                        message = first_line
+
+                output += f"r{log['revision']}\n"
+                output += f"{message}\n"
+                output += "-" * 28 + "\n"
             return output
 
         else:  # plain

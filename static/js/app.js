@@ -381,6 +381,15 @@ async function viewChangelog(url, oldRev, newRev, name) {
     const revRangeElement = document.getElementById('changelogRevRange');
     const formatSelect = document.getElementById('formatSelect');
 
+    // Set format to user's default preference
+    try {
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        formatSelect.value = config.default_format || 'tortoise';
+    } catch (error) {
+        console.error('Error loading default format:', error);
+    }
+
     // Open modal
     modal.style.display = 'flex';
 
@@ -545,7 +554,8 @@ async function loadSettingsForm() {
         document.getElementById('workingCopyInput').value = config.working_copy_path || '';
         document.getElementById('autoRefreshToggle').checked = config.auto_refresh || false;
         document.getElementById('autoRefreshInterval').value = config.auto_refresh_interval || 60;
-        document.getElementById('defaultFormat').value = config.default_format || 'plain';
+        document.getElementById('defaultFormat').value = config.default_format || 'tortoise';
+        document.getElementById('truncateTortoiseMessages').checked = config.truncate_tortoise_messages !== false;
 
         // Show/hide auto-refresh interval
         const intervalGroup = document.getElementById('autoRefreshIntervalGroup');
@@ -563,7 +573,8 @@ async function saveSettings() {
     const config = {
         auto_refresh: document.getElementById('autoRefreshToggle').checked,
         auto_refresh_interval: parseInt(document.getElementById('autoRefreshInterval').value),
-        default_format: document.getElementById('defaultFormat').value
+        default_format: document.getElementById('defaultFormat').value,
+        truncate_tortoise_messages: document.getElementById('truncateTortoiseMessages').checked
     };
 
     try {
