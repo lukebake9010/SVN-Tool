@@ -232,11 +232,32 @@ function renderTable() {
         const statusClass = getStatusClass(external.status);
         const statusIcon = getStatusIcon(external.status);
 
+        // Build change details HTML if present
+        let changeDetailsHTML = '';
+        if (external.change_details && external.status === 'changed') {
+            const details = [];
+            if (external.change_details.revision) {
+                details.push(`Revision: ${escapeHtml(external.change_details.revision.old)} → ${escapeHtml(external.change_details.revision.new)}`);
+            }
+            if (external.change_details.url) {
+                details.push(`URL changed`);
+            }
+            if (external.change_details.path) {
+                details.push(`Path changed`);
+            }
+            if (details.length > 0) {
+                changeDetailsHTML = `<div class="change-details">${details.join(' • ')}</div>`;
+            }
+        } else if (external.status === 'new') {
+            changeDetailsHTML = `<div class="change-details">Newly added external</div>`;
+        }
+
         return `
             <tr class="external-row status-${statusClass}" data-path="${external.path}">
                 <td>
                     <div class="external-name">${escapeHtml(external.name)}</div>
                     <div class="external-path">${escapeHtml(external.path)}</div>
+                    ${changeDetailsHTML}
                 </td>
                 <td>
                     <span class="revision-badge">${escapeHtml(external.revision)}</span>
@@ -282,9 +303,9 @@ function filterExternals() {
             external.path.toLowerCase().includes(searchTerm) ||
             external.url.toLowerCase().includes(searchTerm);
 
-        // Status filter
+        // Status filter - 'changed' and 'new' are considered 'modified'
         const matchesStatus =
-            (showModified && external.status === 'modified') ||
+            (showModified && (external.status === 'changed' || external.status === 'new')) ||
             (showClean && external.status === 'clean') ||
             (showError && (external.status === 'error' || external.status === 'missing'));
 
@@ -644,6 +665,8 @@ async function fetchManualLog() {
 function getStatusClass(status) {
     const statusMap = {
         'clean': 'success',
+        'changed': 'warning',
+        'new': 'info',
         'modified': 'warning',
         'error': 'error',
         'missing': 'error',
@@ -659,6 +682,8 @@ function getStatusClass(status) {
 function getStatusIcon(status) {
     const iconMap = {
         'clean': 'fas fa-check-circle',
+        'changed': 'fas fa-edit',
+        'new': 'fas fa-plus-circle',
         'modified': 'fas fa-exclamation-circle',
         'error': 'fas fa-times-circle',
         'missing': 'fas fa-question-circle',

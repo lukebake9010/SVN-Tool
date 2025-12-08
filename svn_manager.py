@@ -51,9 +51,53 @@ class SVNManager:
         externals = []
 
         try:
-            # Get all directories with svn:externals property
+            # Get working (current) externals
+            working_externals = self._get_externals_from_propget(self.working_copy_path, pristine=False)
+
+            # Get pristine (BASE) externals for comparison
+            base_externals = self._get_externals_from_propget(self.working_copy_path, pristine=True)
+
+            # Create a lookup for base externals by parent_path + name
+            base_lookup = {}
+            for ext in base_externals:
+                key = f"{ext['parent_path']}:{ext['name']}"
+                base_lookup[key] = ext
+
+            # Process working externals and detect changes
+            for external in working_externals:
+                key = f"{external['parent_path']}:{external['name']}"
+                base_external = base_lookup.get(key)
+
+                # Determine status based on definition changes
+                external['status'], external['change_details'] = self._get_external_status(external, base_external)
+                externals.append(external)
+
+        except subprocess.SubprocessError as e:
+            print(f"Error getting externals: {e}")
+
+        return externals
+
+    def _get_externals_from_propget(self, path: str, pristine: bool = False) -> List[Dict]:
+        """
+        Get externals from svn propget command.
+
+        Args:
+            path: Path to query
+            pristine: If True, get BASE (pristine) version, otherwise get working version
+
+        Returns:
+            List of external definitions
+        """
+        externals = []
+        cmd = [self.svn_command, "propget", "svn:externals", "-R", path]
+
+        # Add -r BASE to get pristine version
+        if pristine:
+            cmd.extend(["-r", "BASE"])
+
+        try:
             result = subprocess.run(
-                [self.svn_command, "propget", "svn:externals", "-R", self.working_copy_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -80,20 +124,12 @@ class SVNManager:
 
                 if external_def and current_path:
                     # Parse external definition
-                    # Format can be:
-                    # local_path [-r REV] URL
-                    # or
-                    # [-r REV] URL local_path
                     external_info = self._parse_external_definition(external_def, current_path)
                     if external_info:
                         externals.append(external_info)
 
-            # Get status for each external
-            for external in externals:
-                external['status'] = self._get_external_status(external)
-
         except subprocess.SubprocessError as e:
-            print(f"Error getting externals: {e}")
+            print(f"Error getting externals from propget: {e}")
 
         return externals
 
@@ -175,65 +211,86 @@ class SVNManager:
             'status': 'unknown'
         }
 
-    def _get_external_status(self, external: Dict) -> str:
-        """Get the status of an external (up-to-date, modified, etc.)."""
-        try:
-            full_path = os.path.join(self.working_copy_path, external['path'])
+    def _get_external_status(self, working_external: Dict, base_external: Optional[Dict] = None) -> Tuple[str, Optional[Dict]]:
+        """
+        Get the status of an external by comparing working vs BASE definition.
 
+        Args:
+            working_external: The current (working) external definition
+            base_external: The pristine (BASE) external definition, or None if newly added
+
+        Returns:
+            Tuple of (status, change_details)
+            status: 'changed', 'new', 'clean', 'missing', or 'error'
+            change_details: Dict with old/new values if changed, None otherwise
+        """
+        try:
+            full_path = os.path.join(self.working_copy_path, working_external['path'])
+
+            # Check if external is newly added (not in BASE)
+            if base_external is None:
+                # Check if the directory exists
+                if not os.path.exists(full_path):
+                    return 'missing', None
+                return 'new', {
+                    'type': 'added',
+                    'message': 'External definition added'
+                }
+
+            # Compare working vs base definitions
+            changes = {}
+            has_changes = False
+
+            # Check revision change
+            if working_external['revision'] != base_external['revision']:
+                changes['revision'] = {
+                    'old': base_external['revision'],
+                    'new': working_external['revision']
+                }
+                has_changes = True
+
+            # Check URL change
+            if working_external['url'] != base_external['url']:
+                changes['url'] = {
+                    'old': base_external['url'],
+                    'new': working_external['url']
+                }
+                has_changes = True
+
+            # Check path change (though this is unlikely as we match by path)
+            if working_external['path'] != base_external['path']:
+                changes['path'] = {
+                    'old': base_external['path'],
+                    'new': working_external['path']
+                }
+                has_changes = True
+
+            if has_changes:
+                return 'changed', changes
+
+            # No changes detected in definition
             # Check if path exists
             if not os.path.exists(full_path):
-                return 'missing'
+                return 'missing', None
 
-            # Get SVN status
-            result = subprocess.run(
-                [self.svn_command, "status", full_path],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=self.working_copy_path
-            )
+            return 'clean', None
 
-            if result.stdout.strip():
-                return 'modified'
-
-            return 'clean'
-
-        except subprocess.SubprocessError:
-            return 'error'
+        except Exception as e:
+            print(f"Error getting external status: {e}")
+            return 'error', None
 
     def get_changed_externals(self) -> List[Dict]:
         """
-        Detect externals with pending changes by checking svn:externals property modifications.
+        Get list of externals that have been modified (definition changes).
+        Returns externals with 'changed' or 'new' status.
         """
-        changed = []
+        all_externals = self.get_externals()
 
-        try:
-            # Check for property changes
-            result = subprocess.run(
-                [self.svn_command, "diff", "--properties-only", self.working_copy_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=self.working_copy_path
-            )
-
-            if result.returncode == 0 and result.stdout.strip():
-                # Parse diff output to find changed externals
-                # This is a simplified version - real implementation would need more robust parsing
-                lines = result.stdout.split('\n')
-                for i, line in enumerate(lines):
-                    if 'svn:externals' in line:
-                        # Found a change in externals property
-                        # Try to extract the details
-                        path_match = re.search(r'Index: (.+)', '\n'.join(lines[max(0, i-5):i]))
-                        if path_match:
-                            changed.append({
-                                'path': path_match.group(1),
-                                'has_changes': True
-                            })
-
-        except subprocess.SubprocessError as e:
-            print(f"Error checking for changed externals: {e}")
+        # Filter to only those with changed or new status
+        changed = [
+            ext for ext in all_externals
+            if ext['status'] in ['changed', 'new']
+        ]
 
         return changed
 
