@@ -8,6 +8,7 @@ import re
 import os
 import shlex
 import urllib.parse
+import posixpath
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -306,6 +307,41 @@ class SVNManager:
 
         return changed
 
+    def _normalize_url(self, url: str) -> str:
+        """
+        Normalize URL by resolving '..' and '.' path elements.
+        SVN does not accept URLs with '..' elements, so we need to resolve them.
+
+        Args:
+            url: The URL to normalize
+
+        Returns:
+            Normalized URL with '..' elements resolved
+        """
+        try:
+            # Parse the URL
+            parsed = urllib.parse.urlparse(url)
+
+            # Normalize the path using posixpath (URLs always use forward slashes)
+            # posixpath.normpath will resolve '..' and '.' elements
+            normalized_path = posixpath.normpath(parsed.path)
+
+            # Reconstruct the URL with the normalized path
+            normalized = urllib.parse.urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                normalized_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+
+            return normalized
+        except Exception as e:
+            print(f"Error normalizing URL: {e}")
+            # If normalization fails, return the original URL
+            return url
+
     def get_log(self, url: str, old_rev: str, new_rev: str, format_type: str = 'xml') -> Optional[str]:
         """
         Get SVN log between two revisions for a given URL.
@@ -326,7 +362,12 @@ class SVNManager:
             if old_rev.upper() == 'HEAD':
                 old_rev = 'HEAD'
 
-            cmd = [self.svn_command, "log", f"-r{old_rev}:{new_rev}", url]
+            # Normalize URL to resolve '..' elements that SVN doesn't accept
+            normalized_url = self._normalize_url(url)
+            if normalized_url != url:
+                print(f"Normalized URL: {url} -> {normalized_url}")
+
+            cmd = [self.svn_command, "log", f"-r{old_rev}:{new_rev}", normalized_url]
             if format_type == 'xml':
                 cmd.append('--xml')
 
