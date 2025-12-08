@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVN External Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1><i class="fas fa-code-branch"></i> SVN External Manager</h1>
+                </div>
+                <div class="header-right">
+                    <button id="settingsBtn" class="btn btn-icon" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button id="refreshBtn" class="btn btn-primary" title="Refresh externals">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Working Copy Info Bar -->
+            <div class="info-bar">
+                <div class="info-item">
+                    <i class="fas fa-folder"></i>
+                    <span id="workingCopyPath">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-clock"></i>
+                    <span>Last scan: <span id="lastScanTime">Never</span></span>
+                </div>
+                <div class="info-item">
+                    <span id="svnStatus" class="status-badge">
+                        <i class="fas fa-circle"></i> Checking...
+                    </span>
+                </div>
+            </div>
+
+            <!-- Search and Filters -->
+            <div class="controls-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search externals...">
+                </div>
+                <div class="filter-controls">
+                    <label>
+                        <input type="checkbox" id="filterModified" checked>
+                        Show Modified
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filterClean" checked>
+                        Show Clean
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filterError" checked>
+                        Show Errors
+                    </label>
+                </div>
+                <div class="stats">
+                    <span id="externalsCount">0 externals</span>
+                </div>
+            </div>
+
+            <!-- Externals Table -->
+            <div class="table-container">
+                <table id="externalsTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-column="name">
+                                <span>Name/Path</span>
+                                <i class="fas fa-sort"></i>
+                            </th>
+                            <th class="sortable" data-column="revision">
+                                <span>Revision</span>
+                                <i class="fas fa-sort"></i>
+                            </th>
+                            <th class="sortable" data-column="url">
+                                <span>URL</span>
+                                <i class="fas fa-sort"></i>
+                            </th>
+                            <th class="sortable" data-column="status">
+                                <span>Status</span>
+                                <i class="fas fa-sort"></i>
+                            </th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="externalsTableBody">
+                        <tr class="loading-row">
+                            <td colspan="5">
+                                <div class="loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading externals...
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No Externals Found</h3>
+                <p>No SVN externals were found in the current working copy.</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error Loading Externals</h3>
+                <p id="errorMessage">An error occurred while loading externals.</p>
+                <button class="btn btn-primary" onclick="loadExternals()">
+                    <i class="fas fa-retry"></i> Retry
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Changelog Modal -->
+    <div id="changelogModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-list-ul"></i> Changelog</h2>
+                <button class="close-btn" onclick="closeChangelogModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="changelog-controls">
+                    <div class="changelog-info">
+                        <span id="changelogPath" class="changelog-path"></span>
+                        <span id="changelogRevRange" class="changelog-rev-range"></span>
+                    </div>
+                    <div class="changelog-actions">
+                        <select id="formatSelect" class="format-select">
+                            <option value="plain">Plain Text</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="commit">Commit Format</option>
+                        </select>
+                        <button id="copyChangelogBtn" class="btn btn-primary">
+                            <i class="fas fa-copy"></i> Copy Changelog
+                        </button>
+                    </div>
+                </div>
+
+                <div id="changelogContent" class="changelog-content">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Loading changelog...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> Settings</h2>
+                <button class="close-btn" onclick="closeSettingsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label for="workingCopyInput">
+                            <i class="fas fa-folder"></i> Working Copy Path
+                        </label>
+                        <div class="input-with-button">
+                            <input type="text" id="workingCopyInput" class="form-control"
+                                   placeholder="/path/to/working/copy">
+                            <button type="button" id="setWorkingCopyBtn" class="btn btn-secondary">
+                                Set Path
+                            </button>
+                        </div>
+                        <small class="form-help">Path to your SVN working copy directory</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoRefreshToggle">
+                            Enable Auto-Refresh
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="autoRefreshIntervalGroup" style="display: none;">
+                        <label for="autoRefreshInterval">
+                            <i class="fas fa-clock"></i> Auto-Refresh Interval (seconds)
+                        </label>
+                        <input type="number" id="autoRefreshInterval" class="form-control"
+                               min="10" max="3600" value="60">
+                        <small class="form-help">How often to automatically refresh externals (10-3600 seconds)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="defaultFormat">
+                            <i class="fas fa-file-alt"></i> Default Changelog Format
+                        </label>
+                        <select id="defaultFormat" class="form-control">
+                            <option value="plain">Plain Text</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="commit">Commit Format</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Log Lookup Modal -->
+    <div id="manualLogModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-search"></i> Manual Log Lookup</h2>
+                <button class="close-btn" onclick="closeManualLogModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="manualLogForm">
+                    <div class="form-group">
+                        <label for="manualUrl">
+                            <i class="fas fa-link"></i> URL
+                        </label>
+                        <input type="text" id="manualUrl" class="form-control"
+                               placeholder="https://svn.example.com/repo/path" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="manualOldRev">
+                            <i class="fas fa-code-branch"></i> Old Revision
+                        </label>
+                        <input type="text" id="manualOldRev" class="form-control"
+                               placeholder="1234" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="manualNewRev">
+                            <i class="fas fa-code-branch"></i> New Revision
+                        </label>
+                        <input type="text" id="manualNewRev" class="form-control"
+                               placeholder="HEAD or 5678" required>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Get Log
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Load JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
