@@ -234,10 +234,21 @@ function renderTable() {
 
         // Build change details HTML if present
         let changeDetailsHTML = '';
+        let viewLogButton = '';
+
+        // Determine the revision range for changelog
+        let oldRev = external.revision;
+        let newRev = 'HEAD';
+        let hasRevisionChange = false;
+
         if (external.change_details && external.status === 'changed') {
             const details = [];
             if (external.change_details.revision) {
                 details.push(`Revision: ${escapeHtml(external.change_details.revision.old)} → ${escapeHtml(external.change_details.revision.new)}`);
+                // Use old and new revisions for the changelog
+                oldRev = external.change_details.revision.old;
+                newRev = external.change_details.revision.new;
+                hasRevisionChange = true;
             }
             if (external.change_details.url) {
                 details.push(`URL changed`);
@@ -250,6 +261,21 @@ function renderTable() {
             }
         } else if (external.status === 'new') {
             changeDetailsHTML = `<div class="change-details">Newly added external</div>`;
+        }
+
+        // Create appropriate View Log button
+        if (hasRevisionChange) {
+            viewLogButton = `
+                <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(oldRev)}', '${escapeHtml(newRev)}', '${escapeHtml(external.name)}')">
+                    <i class="fas fa-list"></i> View Changes
+                </button>
+            `;
+        } else {
+            viewLogButton = `
+                <button class="btn btn-sm btn-secondary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(external.revision)}', 'HEAD', '${escapeHtml(external.name)}')">
+                    <i class="fas fa-history"></i> View Log
+                </button>
+            `;
         }
 
         return `
@@ -273,9 +299,7 @@ function renderTable() {
                     </span>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(external.revision)}', 'HEAD', '${escapeHtml(external.name)}')">
-                        <i class="fas fa-list"></i> View Log
-                    </button>
+                    ${viewLogButton}
                 </td>
             </tr>
         `;
