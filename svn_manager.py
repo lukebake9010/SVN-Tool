@@ -8,6 +8,7 @@ import re
 import os
 import shlex
 import urllib.parse
+import posixpath
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -306,6 +307,92 @@ class SVNManager:
 
         return changed
 
+    def _normalize_url(self, url: str) -> str:
+        """
+        Normalize URL by resolving '..' and '.' path elements.
+        Also resolves ^/ (repository root) references to full URLs.
+        SVN does not accept URLs with '..' elements, so we need to resolve them.
+
+        Args:
+            url: The URL to normalize (may contain ^/ for repository root)
+
+        Returns:
+            Normalized URL with ^/ and '..' elements resolved
+        """
+        try:
+            # First, resolve ^/ if present
+            if url.startswith('^/'):
+                # Get repository root from working copy info
+                info = self.get_working_copy_info()
+                repo_root = info.get('Repository Root')
+
+                if not repo_root:
+                    print("Warning: Could not resolve ^/ - repository root not found")
+                    return url
+
+                # Validate that repo_root is a full URL (has scheme and netloc)
+                parsed_root = urllib.parse.urlparse(repo_root)
+                if not parsed_root.scheme or not parsed_root.netloc:
+                    print(f"Warning: Repository root is not a full URL: {repo_root}")
+                    return url
+
+                # Remove ^/ from the beginning and append to repository root
+                # Handle the path properly - repo_root might already have a path component
+                relative_path = url[2:]  # Remove ^/
+
+                # Join the repository root with the relative path
+                # We need to resolve .. in the context of the full URL
+                if parsed_root.path and not parsed_root.path.endswith('/'):
+                    base_path = parsed_root.path + '/'
+                else:
+                    base_path = parsed_root.path or '/'
+
+                # Combine and normalize the path
+                combined_path = posixpath.normpath(base_path + relative_path)
+
+                # Reconstruct the full URL
+                url = urllib.parse.urlunparse((
+                    parsed_root.scheme,
+                    parsed_root.netloc,
+                    combined_path,
+                    parsed_root.params,
+                    parsed_root.query,
+                    parsed_root.fragment
+                ))
+
+                print(f"Resolved ^/ to repository root: {repo_root}")
+                print(f"Full resolved URL: {url}")
+
+            # Parse the URL
+            parsed = urllib.parse.urlparse(url)
+
+            # Only normalize if we have a valid URL with scheme and netloc
+            if not parsed.scheme or not parsed.netloc:
+                print(f"Warning: URL is not a full URL, cannot normalize: {url}")
+                return url
+
+            # Normalize the path using posixpath (URLs always use forward slashes)
+            # posixpath.normpath will resolve '..' and '.' elements
+            normalized_path = posixpath.normpath(parsed.path) if parsed.path else '/'
+
+            # Reconstruct the URL with the normalized path
+            normalized = urllib.parse.urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                normalized_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+
+            return normalized
+        except Exception as e:
+            print(f"Error normalizing URL: {e}")
+            import traceback
+            traceback.print_exc()
+            # If normalization fails, return the original URL
+            return url
+
     def get_log(self, url: str, old_rev: str, new_rev: str, format_type: str = 'xml') -> Optional[str]:
         """
         Get SVN log between two revisions for a given URL.
@@ -326,7 +413,12 @@ class SVNManager:
             if old_rev.upper() == 'HEAD':
                 old_rev = 'HEAD'
 
-            cmd = [self.svn_command, "log", f"-r{old_rev}:{new_rev}", url]
+            # Normalize URL to resolve '..' elements that SVN doesn't accept
+            normalized_url = self._normalize_url(url)
+            if normalized_url != url:
+                print(f"Normalized URL: {url} -> {normalized_url}")
+
+            cmd = [self.svn_command, "log", f"-r{old_rev}:{new_rev}", normalized_url]
             if format_type == 'xml':
                 cmd.append('--xml')
 
@@ -336,7 +428,8 @@ class SVNManager:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                cwd=self.working_copy_path
             )
 
             if result.returncode != 0:
