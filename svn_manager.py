@@ -310,15 +310,30 @@ class SVNManager:
     def _normalize_url(self, url: str) -> str:
         """
         Normalize URL by resolving '..' and '.' path elements.
+        Also resolves ^/ (repository root) references to full URLs.
         SVN does not accept URLs with '..' elements, so we need to resolve them.
 
         Args:
-            url: The URL to normalize
+            url: The URL to normalize (may contain ^/ for repository root)
 
         Returns:
-            Normalized URL with '..' elements resolved
+            Normalized URL with ^/ and '..' elements resolved
         """
         try:
+            # First, resolve ^/ if present
+            if url.startswith('^/'):
+                # Get repository root from working copy info
+                info = self.get_working_copy_info()
+                repo_root = info.get('Repository Root')
+
+                if repo_root:
+                    # Replace ^/ with the repository root URL
+                    url = url.replace('^/', repo_root + '/', 1)
+                    print(f"Resolved ^/ to repository root: {repo_root}")
+                else:
+                    print("Warning: Could not resolve ^/ - repository root not found")
+                    return url
+
             # Parse the URL
             parsed = urllib.parse.urlparse(url)
 
