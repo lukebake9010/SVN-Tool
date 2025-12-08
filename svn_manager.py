@@ -151,7 +151,8 @@ class SVNManager:
         url = None
         local_path = None
 
-        # Check for -r or -rREV flag
+        # First pass: extract revision flags and collect non-revision parts
+        non_revision_parts = []
         i = 0
         while i < len(parts):
             part = parts[i]
@@ -162,31 +163,33 @@ class SVNManager:
                 revision = part[2:]
                 i += 1
             else:
-                # First non-revision part
-                if url is None:
-                    # Could be URL or local_path
-                    # Check if it looks like a URL
-                    if (part.startswith('http://') or part.startswith('https://') or
-                        part.startswith('svn://') or part.startswith('svn+ssh://') or
-                        part.startswith('file://') or part.startswith('^/')):
-                        url = part
-                        # Next part is local_path if exists
-                        if i + 1 < len(parts):
-                            local_path = parts[i + 1]
-                            i += 2
-                        else:
-                            # No local path specified, will derive from URL
-                            i += 1
-                    else:
-                        # Old format: local_path [-r REV] URL
-                        local_path = part
-                        if i + 1 < len(parts):
-                            url = parts[i + 1]
-                            i += 2
-                        else:
-                            i += 1
-                else:
-                    i += 1
+                non_revision_parts.append(part)
+                i += 1
+
+        # Second pass: determine URL and local_path from non-revision parts
+        if len(non_revision_parts) == 0:
+            return None
+        elif len(non_revision_parts) == 1:
+            # Only one part, must be URL
+            url = non_revision_parts[0]
+        else:
+            # Two or more parts: determine which is URL and which is local_path
+            # Check if first part looks like a URL
+            first_is_url = (non_revision_parts[0].startswith('http://') or
+                           non_revision_parts[0].startswith('https://') or
+                           non_revision_parts[0].startswith('svn://') or
+                           non_revision_parts[0].startswith('svn+ssh://') or
+                           non_revision_parts[0].startswith('file://') or
+                           non_revision_parts[0].startswith('^/'))
+
+            if first_is_url:
+                # New format: [-r REV] URL local_path
+                url = non_revision_parts[0]
+                local_path = non_revision_parts[1] if len(non_revision_parts) > 1 else None
+            else:
+                # Old format: local_path [-r REV] URL
+                local_path = non_revision_parts[0]
+                url = non_revision_parts[1] if len(non_revision_parts) > 1 else None
 
         if not url:
             return None
@@ -318,6 +321,8 @@ class SVNManager:
             if format_type == 'xml':
                 cmd.append('--xml')
 
+            print(f"Executing SVN log command: {' '.join(cmd)}")
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -326,6 +331,9 @@ class SVNManager:
             )
 
             if result.returncode != 0:
+                print(f"SVN log command failed with code {result.returncode}")
+                print(f"stderr: {result.stderr}")
+                print(f"stdout: {result.stdout}")
                 return None
 
             return result.stdout
