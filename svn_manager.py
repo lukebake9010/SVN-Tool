@@ -484,7 +484,7 @@ class SVNManager:
 
         Args:
             logs: List of log entries
-            format_type: 'plain', 'markdown', or 'commit'
+            format_type: 'plain', 'markdown', 'commit', or 'tortoise'
 
         Returns:
             Formatted changelog string
@@ -504,6 +504,15 @@ class SVNManager:
             output = "Changes:\n"
             for log in logs:
                 output += f"- r{log['revision']}: {log['message'].split(chr(10))[0]}\n"
+            return output
+
+        elif format_type == 'tortoise':
+            # TortoiseSVN-style format
+            output = ""
+            for log in logs:
+                output += f"r{log['revision']}\n"
+                output += f"{log['message']}\n"
+                output += "-" * 28 + "\n"
             return output
 
         else:  # plain
