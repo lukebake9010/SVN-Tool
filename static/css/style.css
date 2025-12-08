@@ -320,6 +320,17 @@ body {
     font-family: var(--font-mono);
 }
 
+.change-details {
+    font-size: 0.75rem;
+    color: var(--warning-color);
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-sm);
+    display: inline-block;
+    font-weight: 500;
+}
+
 .external-url {
     max-width: 400px;
     overflow: hidden;
@@ -372,6 +383,11 @@ body {
 .status-badge.status-error {
     background: rgba(239, 68, 68, 0.1);
     color: var(--error-color);
+}
+
+.status-badge.status-info {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--info-color);
 }
 
 .status-badge.status-default {

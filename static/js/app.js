@@ -232,11 +232,58 @@ function renderTable() {
         const statusClass = getStatusClass(external.status);
         const statusIcon = getStatusIcon(external.status);
 
+        // Build change details HTML if present
+        let changeDetailsHTML = '';
+        let viewLogButton = '';
+
+        // Determine the revision range for changelog
+        let oldRev = external.revision;
+        let newRev = 'HEAD';
+        let hasRevisionChange = false;
+
+        if (external.change_details && external.status === 'changed') {
+            const details = [];
+            if (external.change_details.revision) {
+                details.push(`Revision: ${escapeHtml(external.change_details.revision.old)} → ${escapeHtml(external.change_details.revision.new)}`);
+                // Use old and new revisions for the changelog
+                oldRev = external.change_details.revision.old;
+                newRev = external.change_details.revision.new;
+                hasRevisionChange = true;
+            }
+            if (external.change_details.url) {
+                details.push(`URL changed`);
+            }
+            if (external.change_details.path) {
+                details.push(`Path changed`);
+            }
+            if (details.length > 0) {
+                changeDetailsHTML = `<div class="change-details">${details.join(' • ')}</div>`;
+            }
+        } else if (external.status === 'new') {
+            changeDetailsHTML = `<div class="change-details">Newly added external</div>`;
+        }
+
+        // Create appropriate View Log button
+        if (hasRevisionChange) {
+            viewLogButton = `
+                <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(oldRev)}', '${escapeHtml(newRev)}', '${escapeHtml(external.name)}')">
+                    <i class="fas fa-list"></i> View Changes
+                </button>
+            `;
+        } else {
+            viewLogButton = `
+                <button class="btn btn-sm btn-secondary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(external.revision)}', 'HEAD', '${escapeHtml(external.name)}')">
+                    <i class="fas fa-history"></i> View Log
+                </button>
+            `;
+        }
+
         return `
             <tr class="external-row status-${statusClass}" data-path="${external.path}">
                 <td>
                     <div class="external-name">${escapeHtml(external.name)}</div>
                     <div class="external-path">${escapeHtml(external.path)}</div>
+                    ${changeDetailsHTML}
                 </td>
                 <td>
                     <span class="revision-badge">${escapeHtml(external.revision)}</span>
@@ -252,9 +299,7 @@ function renderTable() {
                     </span>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(external.revision)}', 'HEAD', '${escapeHtml(external.name)}')">
-                        <i class="fas fa-list"></i> View Log
-                    </button>
+                    ${viewLogButton}
                 </td>
             </tr>
         `;
@@ -282,9 +327,9 @@ function filterExternals() {
             external.path.toLowerCase().includes(searchTerm) ||
             external.url.toLowerCase().includes(searchTerm);
 
-        // Status filter
+        // Status filter - 'changed' and 'new' are considered 'modified'
         const matchesStatus =
-            (showModified && external.status === 'modified') ||
+            (showModified && (external.status === 'changed' || external.status === 'new')) ||
             (showClean && external.status === 'clean') ||
             (showError && (external.status === 'error' || external.status === 'missing'));
 
@@ -644,6 +689,8 @@ async function fetchManualLog() {
 function getStatusClass(status) {
     const statusMap = {
         'clean': 'success',
+        'changed': 'warning',
+        'new': 'info',
         'modified': 'warning',
         'error': 'error',
         'missing': 'error',
@@ -659,6 +706,8 @@ function getStatusClass(status) {
 function getStatusIcon(status) {
     const iconMap = {
         'clean': 'fas fa-check-circle',
+        'changed': 'fas fa-edit',
+        'new': 'fas fa-plus-circle',
         'modified': 'fas fa-exclamation-circle',
         'error': 'fas fa-times-circle',
         'missing': 'fas fa-question-circle',

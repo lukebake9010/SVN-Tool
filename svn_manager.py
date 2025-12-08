@@ -51,9 +51,53 @@ class SVNManager:
         externals = []
 
         try:
-            # Get all directories with svn:externals property
+            # Get working (current) externals
+            working_externals = self._get_externals_from_propget(self.working_copy_path, pristine=False)
+
+            # Get pristine (BASE) externals for comparison
+            base_externals = self._get_externals_from_propget(self.working_copy_path, pristine=True)
+
+            # Create a lookup for base externals by parent_path + name
+            base_lookup = {}
+            for ext in base_externals:
+                key = f"{ext['parent_path']}:{ext['name']}"
+                base_lookup[key] = ext
+
+            # Process working externals and detect changes
+            for external in working_externals:
+                key = f"{external['parent_path']}:{external['name']}"
+                base_external = base_lookup.get(key)
+
+                # Determine status based on definition changes
+                external['status'], external['change_details'] = self._get_external_status(external, base_external)
+                externals.append(external)
+
+        except subprocess.SubprocessError as e:
+            print(f"Error getting externals: {e}")
+
+        return externals
+
+    def _get_externals_from_propget(self, path: str, pristine: bool = False) -> List[Dict]:
+        """
+        Get externals from svn propget command.
+
+        Args:
+            path: Path to query
+            pristine: If True, get BASE (pristine) version, otherwise get working version
+
+        Returns:
+            List of external definitions
+        """
+        externals = []
+        cmd = [self.svn_command, "propget", "svn:externals", "-R", path]
+
+        # Add -r BASE to get pristine version
+        if pristine:
+            cmd.extend(["-r", "BASE"])
+
+        try:
             result = subprocess.run(
-                [self.svn_command, "propget", "svn:externals", "-R", self.working_copy_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -80,20 +124,12 @@ class SVNManager:
 
                 if external_def and current_path:
                     # Parse external definition
-                    # Format can be:
-                    # local_path [-r REV] URL
-                    # or
-                    # [-r REV] URL local_path
                     external_info = self._parse_external_definition(external_def, current_path)
                     if external_info:
                         externals.append(external_info)
 
-            # Get status for each external
-            for external in externals:
-                external['status'] = self._get_external_status(external)
-
         except subprocess.SubprocessError as e:
-            print(f"Error getting externals: {e}")
+            print(f"Error getting externals from propget: {e}")
 
         return externals
 
@@ -108,14 +144,15 @@ class SVNManager:
             # but preserve %20 and other URL encoding
             parts = definition.split()
 
-        if len(parts) < 2:
+        if len(parts) < 1:
             return None
 
         revision = None
         url = None
         local_path = None
 
-        # Check for -r or -rREV flag
+        # First pass: extract revision flags and collect non-revision parts
+        non_revision_parts = []
         i = 0
         while i < len(parts):
             part = parts[i]
@@ -126,34 +163,45 @@ class SVNManager:
                 revision = part[2:]
                 i += 1
             else:
-                # First non-revision part
-                if url is None:
-                    # Could be URL or local_path
-                    # Check if it looks like a URL
-                    if (part.startswith('http://') or part.startswith('https://') or
-                        part.startswith('svn://') or part.startswith('svn+ssh://') or
-                        part.startswith('file://') or part.startswith('^/')):
-                        url = part
-                        # Next part is local_path if exists
-                        if i + 1 < len(parts):
-                            local_path = parts[i + 1]
-                            i += 2
-                        else:
-                            # No local path specified, will derive from URL
-                            i += 1
-                    else:
-                        # Old format: local_path [-r REV] URL
-                        local_path = part
-                        if i + 1 < len(parts):
-                            url = parts[i + 1]
-                            i += 2
-                        else:
-                            i += 1
-                else:
-                    i += 1
+                non_revision_parts.append(part)
+                i += 1
+
+        # Second pass: determine URL and local_path from non-revision parts
+        if len(non_revision_parts) == 0:
+            return None
+        elif len(non_revision_parts) == 1:
+            # Only one part, must be URL
+            url = non_revision_parts[0]
+        else:
+            # Two or more parts: determine which is URL and which is local_path
+            # Check if first part looks like a URL
+            first_is_url = (non_revision_parts[0].startswith('http://') or
+                           non_revision_parts[0].startswith('https://') or
+                           non_revision_parts[0].startswith('svn://') or
+                           non_revision_parts[0].startswith('svn+ssh://') or
+                           non_revision_parts[0].startswith('file://') or
+                           non_revision_parts[0].startswith('^/'))
+
+            if first_is_url:
+                # New format: [-r REV] URL local_path
+                url = non_revision_parts[0]
+                local_path = non_revision_parts[1] if len(non_revision_parts) > 1 else None
+            else:
+                # Old format: local_path [-r REV] URL
+                local_path = non_revision_parts[0]
+                url = non_revision_parts[1] if len(non_revision_parts) > 1 else None
 
         if not url:
             return None
+
+        # Check for peg revision format (URL@REV)
+        # This takes precedence over -r flag if both are present
+        if '@' in url:
+            # Split URL and peg revision
+            parts = url.rsplit('@', 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                url = parts[0]
+                revision = parts[1]
 
         # If no local_path found, use last component of URL
         if not local_path:
@@ -175,65 +223,86 @@ class SVNManager:
             'status': 'unknown'
         }
 
-    def _get_external_status(self, external: Dict) -> str:
-        """Get the status of an external (up-to-date, modified, etc.)."""
-        try:
-            full_path = os.path.join(self.working_copy_path, external['path'])
+    def _get_external_status(self, working_external: Dict, base_external: Optional[Dict] = None) -> Tuple[str, Optional[Dict]]:
+        """
+        Get the status of an external by comparing working vs BASE definition.
 
+        Args:
+            working_external: The current (working) external definition
+            base_external: The pristine (BASE) external definition, or None if newly added
+
+        Returns:
+            Tuple of (status, change_details)
+            status: 'changed', 'new', 'clean', 'missing', or 'error'
+            change_details: Dict with old/new values if changed, None otherwise
+        """
+        try:
+            full_path = os.path.join(self.working_copy_path, working_external['path'])
+
+            # Check if external is newly added (not in BASE)
+            if base_external is None:
+                # Check if the directory exists
+                if not os.path.exists(full_path):
+                    return 'missing', None
+                return 'new', {
+                    'type': 'added',
+                    'message': 'External definition added'
+                }
+
+            # Compare working vs base definitions
+            changes = {}
+            has_changes = False
+
+            # Check revision change
+            if working_external['revision'] != base_external['revision']:
+                changes['revision'] = {
+                    'old': base_external['revision'],
+                    'new': working_external['revision']
+                }
+                has_changes = True
+
+            # Check URL change
+            if working_external['url'] != base_external['url']:
+                changes['url'] = {
+                    'old': base_external['url'],
+                    'new': working_external['url']
+                }
+                has_changes = True
+
+            # Check path change (though this is unlikely as we match by path)
+            if working_external['path'] != base_external['path']:
+                changes['path'] = {
+                    'old': base_external['path'],
+                    'new': working_external['path']
+                }
+                has_changes = True
+
+            if has_changes:
+                return 'changed', changes
+
+            # No changes detected in definition
             # Check if path exists
             if not os.path.exists(full_path):
-                return 'missing'
+                return 'missing', None
 
-            # Get SVN status
-            result = subprocess.run(
-                [self.svn_command, "status", full_path],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=self.working_copy_path
-            )
+            return 'clean', None
 
-            if result.stdout.strip():
-                return 'modified'
-
-            return 'clean'
-
-        except subprocess.SubprocessError:
-            return 'error'
+        except Exception as e:
+            print(f"Error getting external status: {e}")
+            return 'error', None
 
     def get_changed_externals(self) -> List[Dict]:
         """
-        Detect externals with pending changes by checking svn:externals property modifications.
+        Get list of externals that have been modified (definition changes).
+        Returns externals with 'changed' or 'new' status.
         """
-        changed = []
+        all_externals = self.get_externals()
 
-        try:
-            # Check for property changes
-            result = subprocess.run(
-                [self.svn_command, "diff", "--properties-only", self.working_copy_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=self.working_copy_path
-            )
-
-            if result.returncode == 0 and result.stdout.strip():
-                # Parse diff output to find changed externals
-                # This is a simplified version - real implementation would need more robust parsing
-                lines = result.stdout.split('\n')
-                for i, line in enumerate(lines):
-                    if 'svn:externals' in line:
-                        # Found a change in externals property
-                        # Try to extract the details
-                        path_match = re.search(r'Index: (.+)', '\n'.join(lines[max(0, i-5):i]))
-                        if path_match:
-                            changed.append({
-                                'path': path_match.group(1),
-                                'has_changes': True
-                            })
-
-        except subprocess.SubprocessError as e:
-            print(f"Error checking for changed externals: {e}")
+        # Filter to only those with changed or new status
+        changed = [
+            ext for ext in all_externals
+            if ext['status'] in ['changed', 'new']
+        ]
 
         return changed
 
@@ -261,6 +330,8 @@ class SVNManager:
             if format_type == 'xml':
                 cmd.append('--xml')
 
+            print(f"Executing SVN log command: {' '.join(cmd)}")
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -269,6 +340,9 @@ class SVNManager:
             )
 
             if result.returncode != 0:
+                print(f"SVN log command failed with code {result.returncode}")
+                print(f"stderr: {result.stderr}")
+                print(f"stdout: {result.stdout}")
                 return None
 
             return result.stdout
