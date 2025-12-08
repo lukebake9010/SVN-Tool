@@ -525,7 +525,7 @@ class SVNManager:
 
                 output += f"r{log['revision']}\n"
                 output += f"{message}\n"
-                output += "-" * 28 + "\n"
+                output += "-" * 21 + "\n"
             return output
 
         else:  # plain
