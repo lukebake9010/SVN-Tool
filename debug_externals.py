@@ -23,6 +23,11 @@ test_cases = [
     # With -rREV (no space)
     ("-r12345 https://example.com/repo/trunk vendor/lib", "."),
     ("vendor/lib -r12345 https://example.com/repo/trunk", "."),
+
+    # Peg revision format (URL@REV)
+    ("^/../Repo/trunk/Externals/External(1)@7618", "."),
+    ("https://example.com/repo/trunk@12345 vendor/lib", "."),
+    ("^/trunk@7618 external_dir", "."),
 ]
 
 def test_parsing():

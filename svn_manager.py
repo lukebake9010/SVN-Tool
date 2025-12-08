@@ -144,7 +144,7 @@ class SVNManager:
             # but preserve %20 and other URL encoding
             parts = definition.split()
 
-        if len(parts) < 2:
+        if len(parts) < 1:
             return None
 
         revision = None
@@ -193,6 +193,15 @@ class SVNManager:
 
         if not url:
             return None
+
+        # Check for peg revision format (URL@REV)
+        # This takes precedence over -r flag if both are present
+        if '@' in url:
+            # Split URL and peg revision
+            parts = url.rsplit('@', 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                url = parts[0]
+                revision = parts[1]
 
         # If no local_path found, use last component of URL
         if not local_path:
