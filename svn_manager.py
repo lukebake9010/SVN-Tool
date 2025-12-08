@@ -6,6 +6,8 @@ Handles all SVN operations including listing externals, detecting changes, and f
 import subprocess
 import re
 import os
+import shlex
+import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -96,8 +98,16 @@ class SVNManager:
         return externals
 
     def _parse_external_definition(self, definition: str, parent_path: str) -> Optional[Dict]:
-        """Parse an SVN external definition string."""
-        parts = definition.split()
+        """Parse an SVN external definition string with support for spaces and quoted paths."""
+        try:
+            # Use shlex to properly handle quoted strings
+            # This preserves quoted paths and URLs with spaces
+            parts = shlex.split(definition)
+        except ValueError:
+            # If shlex fails (e.g., unmatched quotes), fall back to simple split
+            # but preserve %20 and other URL encoding
+            parts = definition.split()
+
         if len(parts) < 2:
             return None
 
@@ -119,14 +129,17 @@ class SVNManager:
                 # First non-revision part
                 if url is None:
                     # Could be URL or local_path
-                    if part.startswith('http://') or part.startswith('https://') or part.startswith('svn://') or part.startswith('^/'):
+                    # Check if it looks like a URL
+                    if (part.startswith('http://') or part.startswith('https://') or
+                        part.startswith('svn://') or part.startswith('svn+ssh://') or
+                        part.startswith('file://') or part.startswith('^/')):
                         url = part
                         # Next part is local_path if exists
                         if i + 1 < len(parts):
                             local_path = parts[i + 1]
                             i += 2
                         else:
-                            # Old format: local_path URL
+                            # No local path specified, will derive from URL
                             i += 1
                     else:
                         # Old format: local_path [-r REV] URL
@@ -144,7 +157,12 @@ class SVNManager:
 
         # If no local_path found, use last component of URL
         if not local_path:
-            local_path = url.rstrip('/').split('/')[-1]
+            # Decode %20 and other URL encoding for the local path
+            decoded_url = urllib.parse.unquote(url)
+            local_path = decoded_url.rstrip('/').split('/')[-1]
+
+        # Decode URL-encoded spaces in local_path if present
+        local_path = urllib.parse.unquote(local_path)
 
         full_path = os.path.join(parent_path, local_path) if parent_path != '.' else local_path
 
