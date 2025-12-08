@@ -326,20 +326,54 @@ class SVNManager:
                 info = self.get_working_copy_info()
                 repo_root = info.get('Repository Root')
 
-                if repo_root:
-                    # Replace ^/ with the repository root URL
-                    url = url.replace('^/', repo_root + '/', 1)
-                    print(f"Resolved ^/ to repository root: {repo_root}")
-                else:
+                if not repo_root:
                     print("Warning: Could not resolve ^/ - repository root not found")
                     return url
+
+                # Validate that repo_root is a full URL (has scheme and netloc)
+                parsed_root = urllib.parse.urlparse(repo_root)
+                if not parsed_root.scheme or not parsed_root.netloc:
+                    print(f"Warning: Repository root is not a full URL: {repo_root}")
+                    return url
+
+                # Remove ^/ from the beginning and append to repository root
+                # Handle the path properly - repo_root might already have a path component
+                relative_path = url[2:]  # Remove ^/
+
+                # Join the repository root with the relative path
+                # We need to resolve .. in the context of the full URL
+                if parsed_root.path and not parsed_root.path.endswith('/'):
+                    base_path = parsed_root.path + '/'
+                else:
+                    base_path = parsed_root.path or '/'
+
+                # Combine and normalize the path
+                combined_path = posixpath.normpath(base_path + relative_path)
+
+                # Reconstruct the full URL
+                url = urllib.parse.urlunparse((
+                    parsed_root.scheme,
+                    parsed_root.netloc,
+                    combined_path,
+                    parsed_root.params,
+                    parsed_root.query,
+                    parsed_root.fragment
+                ))
+
+                print(f"Resolved ^/ to repository root: {repo_root}")
+                print(f"Full resolved URL: {url}")
 
             # Parse the URL
             parsed = urllib.parse.urlparse(url)
 
+            # Only normalize if we have a valid URL with scheme and netloc
+            if not parsed.scheme or not parsed.netloc:
+                print(f"Warning: URL is not a full URL, cannot normalize: {url}")
+                return url
+
             # Normalize the path using posixpath (URLs always use forward slashes)
             # posixpath.normpath will resolve '..' and '.' elements
-            normalized_path = posixpath.normpath(parsed.path)
+            normalized_path = posixpath.normpath(parsed.path) if parsed.path else '/'
 
             # Reconstruct the URL with the normalized path
             normalized = urllib.parse.urlunparse((
@@ -354,6 +388,8 @@ class SVNManager:
             return normalized
         except Exception as e:
             print(f"Error normalizing URL: {e}")
+            import traceback
+            traceback.print_exc()
             # If normalization fails, return the original URL
             return url
 
