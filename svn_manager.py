@@ -507,9 +507,9 @@ class SVNManager:
             return output
 
         elif format_type == 'tortoise':
-            # TortoiseSVN-style format
+            # TortoiseSVN-style format (newest first)
             output = ""
-            for log in logs:
+            for log in reversed(logs):
                 output += f"r{log['revision']}\n"
                 output += f"{log['message']}\n"
                 output += "-" * 28 + "\n"
