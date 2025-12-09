@@ -661,13 +661,13 @@ class SVNManager:
             return False, f"Path does not exist: {full_path}"
 
         try:
-            # Build command to open properties dialog for svn:externals
+            # Build command to open properties dialog
             # Note: Path must be quoted to ensure TortoiseSVN parses it correctly
+            # We don't specify /property:svn:externals to avoid fallback issues
             cmd = [
                 tortoise_path,
                 "/command:properties",
-                f'/path:"{full_path}"',
-                "/property:svn:externals"
+                f'/path:"{full_path}"'
             ]
 
             print(f"Executing TortoiseSVN command: {' '.join(cmd)}")
