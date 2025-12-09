@@ -127,6 +127,7 @@ class SVNManager:
                     # Parse external definition
                     external_info = self._parse_external_definition(external_def, current_path)
                     if external_info:
+                        print(f"DEBUG: Parsed external - name: '{external_info.get('name')}', parent_path: '{external_info.get('parent_path')}', path: '{external_info.get('path')}'")
                         externals.append(external_info)
 
         except subprocess.SubprocessError as e:
@@ -646,8 +647,14 @@ class SVNManager:
         if not tortoise_path:
             return False, "TortoiseSVN not found. Please install TortoiseSVN."
 
+        # Debug logging
+        print(f"DEBUG: parent_path received: '{parent_path}'")
+        print(f"DEBUG: working_copy_path: '{self.working_copy_path}'")
+
         # Build full path and normalize it (converts forward slashes to backslashes on Windows)
         full_path = os.path.normpath(os.path.join(self.working_copy_path, parent_path))
+
+        print(f"DEBUG: full_path after join and normpath: '{full_path}'")
 
         # Ensure path exists
         if not os.path.exists(full_path):
