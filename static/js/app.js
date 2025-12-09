@@ -9,6 +9,8 @@ let filteredData = [];
 let currentSort = { column: 'name', ascending: true };
 let autoRefreshInterval = null;
 let currentChangelog = { logs: [], format: 'plain' };
+let workingCopies = [];
+let activeWorkingCopyPath = null;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -21,6 +23,9 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     // Check SVN status
     checkStatus();
+
+    // Load working copies
+    loadWorkingCopies();
 
     // Load externals
     loadExternals();
@@ -73,6 +78,16 @@ function setupEventListeners() {
     // Set working copy button
     document.getElementById('setWorkingCopyBtn').addEventListener('click', function() {
         setWorkingCopy();
+    });
+
+    // Set projects directory button
+    document.getElementById('setProjectsDirectoryBtn').addEventListener('click', function() {
+        setProjectsDirectory();
+    });
+
+    // Refresh tabs button
+    document.getElementById('refreshTabsBtn').addEventListener('click', function() {
+        loadWorkingCopies();
     });
 
     // Auto-refresh toggle
@@ -129,6 +144,141 @@ async function checkStatus() {
 
     } catch (error) {
         console.error('Error checking status:', error);
+    }
+}
+
+/**
+ * Load working copies from the API
+ */
+async function loadWorkingCopies() {
+    try {
+        const response = await fetch('/api/working-copies');
+        const data = await response.json();
+
+        if (data.success) {
+            workingCopies = data.working_copies;
+            activeWorkingCopyPath = data.active_path;
+            renderWorkingCopyTabs();
+        }
+    } catch (error) {
+        console.error('Error loading working copies:', error);
+    }
+}
+
+/**
+ * Render working copy tabs
+ */
+function renderWorkingCopyTabs() {
+    const tabsContainer = document.getElementById('workingCopyTabs');
+    const tabsList = document.getElementById('tabsList');
+
+    // If no working copies, hide tabs
+    if (workingCopies.length === 0) {
+        tabsContainer.style.display = 'none';
+        return;
+    }
+
+    // Show tabs container
+    tabsContainer.style.display = 'block';
+
+    // Clear existing tabs
+    tabsList.innerHTML = '';
+
+    // Create tab for each working copy
+    workingCopies.forEach(wc => {
+        const tab = document.createElement('button');
+        tab.className = 'tab-button';
+        tab.textContent = wc.name;
+        tab.title = wc.path;
+
+        // Mark active tab
+        if (wc.path === activeWorkingCopyPath) {
+            tab.classList.add('active');
+        }
+
+        // Add click handler
+        tab.addEventListener('click', () => {
+            switchWorkingCopy(wc.path);
+        });
+
+        tabsList.appendChild(tab);
+    });
+}
+
+/**
+ * Switch to a different working copy
+ */
+async function switchWorkingCopy(path) {
+    try {
+        const response = await fetch('/api/working-copies/activate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ path: path })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            activeWorkingCopyPath = data.path;
+
+            // Update tabs
+            renderWorkingCopyTabs();
+
+            // Update working copy path display
+            document.getElementById('workingCopyPath').textContent = path;
+
+            // Reload externals for the new working copy
+            loadExternals();
+
+            showToast('Switched to ' + path.split('/').pop(), 'success');
+        } else {
+            showToast('Failed to switch working copy: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error switching working copy:', error);
+        showToast('Error switching working copy', 'error');
+    }
+}
+
+/**
+ * Set projects directory
+ */
+async function setProjectsDirectory() {
+    const path = document.getElementById('projectsDirectoryInput').value.trim();
+
+    if (!path) {
+        showToast('Please enter a projects directory path', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/working-copies/projects-directory', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ path: path })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            workingCopies = data.working_copies;
+            renderWorkingCopyTabs();
+            showToast(`Found ${workingCopies.length} working cop${workingCopies.length === 1 ? 'y' : 'ies'}`, 'success');
+
+            // If working copies were found, switch to the first one
+            if (workingCopies.length > 0) {
+                switchWorkingCopy(workingCopies[0].path);
+            }
+        } else {
+            showToast('Failed to set projects directory: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error setting projects directory:', error);
+        showToast('Error setting projects directory', 'error');
     }
 }
 
@@ -551,7 +701,8 @@ async function loadSettingsForm() {
         const response = await fetch('/api/config');
         const config = await response.json();
 
-        document.getElementById('workingCopyInput').value = config.working_copy_path || '';
+        document.getElementById('projectsDirectoryInput').value = config.projects_directory || '';
+        document.getElementById('workingCopyInput').value = config.active_working_copy_path || '';
         document.getElementById('autoRefreshToggle').checked = config.auto_refresh || false;
         document.getElementById('autoRefreshInterval').value = config.auto_refresh_interval || 60;
         document.getElementById('defaultFormat').value = config.default_format || 'tortoise';

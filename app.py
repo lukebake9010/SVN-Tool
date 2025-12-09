@@ -25,7 +25,18 @@ def load_config():
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
-                return json.load(f)
+                config = json.load(f)
+                # Migrate old config format to new format
+                if 'working_copy_path' in config and 'projects_directory' not in config:
+                    # Old format: single working_copy_path
+                    old_path = config['working_copy_path']
+                    config['active_working_copy_path'] = old_path
+                    # Try to determine projects directory from old path
+                    if os.path.isdir(old_path):
+                        config['projects_directory'] = os.path.dirname(old_path)
+                    del config['working_copy_path']
+                    save_config(config)
+                return config
         except json.JSONDecodeError:
             return {}
     return {}
@@ -41,13 +52,54 @@ def save_config(config):
         return False
 
 
+def discover_working_copies(directory):
+    """
+    Scan directory for SVN working copies.
+
+    Args:
+        directory: Path to scan for working copies
+
+    Returns:
+        List of dicts with 'name' and 'path' for each discovered working copy
+    """
+    working_copies = []
+
+    if not os.path.isdir(directory):
+        return working_copies
+
+    try:
+        # Scan immediate subdirectories
+        for entry in os.listdir(directory):
+            full_path = os.path.join(directory, entry)
+
+            # Skip if not a directory
+            if not os.path.isdir(full_path):
+                continue
+
+            # Check if this directory has a .svn subdirectory
+            svn_dir = os.path.join(full_path, '.svn')
+            if os.path.isdir(svn_dir):
+                working_copies.append({
+                    'name': entry,
+                    'path': full_path
+                })
+
+        # Sort by name
+        working_copies.sort(key=lambda x: x['name'].lower())
+
+    except (OSError, PermissionError) as e:
+        print(f"Error scanning directory {directory}: {e}")
+
+    return working_copies
+
+
 def get_svn_manager():
     """Get or create SVN manager instance."""
     global svn_manager
 
     if svn_manager is None:
         config = load_config()
-        working_copy = config.get('working_copy_path', os.getcwd())
+        working_copy = config.get('active_working_copy_path', os.getcwd())
         svn_manager = SVNManager(working_copy)
 
     return svn_manager
@@ -95,7 +147,7 @@ def api_set_config():
 
 @app.route('/api/working-copy', methods=['POST'])
 def api_set_working_copy():
-    """Set the working copy path."""
+    """Set the working copy path (legacy endpoint for backward compatibility)."""
     data = request.json
     path = data.get('path')
 
@@ -111,7 +163,7 @@ def api_set_working_copy():
     if manager.set_working_copy(path):
         # Save to config
         config = load_config()
-        config['working_copy_path'] = path
+        config['active_working_copy_path'] = path
         save_config(config)
 
         return jsonify({
@@ -132,6 +184,102 @@ def api_working_copy_info():
     info = manager.get_working_copy_info()
 
     return jsonify(info)
+
+
+@app.route('/api/working-copies', methods=['GET'])
+def api_get_working_copies():
+    """Get all discovered working copies from the projects directory."""
+    config = load_config()
+    projects_dir = config.get('projects_directory')
+
+    if not projects_dir:
+        return jsonify({
+            'success': True,
+            'working_copies': [],
+            'projects_directory': None,
+            'active_path': config.get('active_working_copy_path')
+        })
+
+    # Expand user path
+    projects_dir = os.path.expanduser(projects_dir)
+    projects_dir = os.path.abspath(projects_dir)
+
+    working_copies = discover_working_copies(projects_dir)
+
+    return jsonify({
+        'success': True,
+        'working_copies': working_copies,
+        'projects_directory': projects_dir,
+        'active_path': config.get('active_working_copy_path')
+    })
+
+
+@app.route('/api/working-copies/projects-directory', methods=['POST'])
+def api_set_projects_directory():
+    """Set the projects directory and discover working copies."""
+    data = request.json
+    path = data.get('path')
+
+    if not path:
+        return jsonify({'success': False, 'error': 'Path is required'}), 400
+
+    # Expand user path
+    path = os.path.expanduser(path)
+    path = os.path.abspath(path)
+
+    if not os.path.isdir(path):
+        return jsonify({
+            'success': False,
+            'error': 'Path is not a valid directory'
+        }), 400
+
+    # Save to config
+    config = load_config()
+    config['projects_directory'] = path
+    save_config(config)
+
+    # Discover working copies
+    working_copies = discover_working_copies(path)
+
+    return jsonify({
+        'success': True,
+        'projects_directory': path,
+        'working_copies': working_copies
+    })
+
+
+@app.route('/api/working-copies/activate', methods=['POST'])
+def api_activate_working_copy():
+    """Switch to a different working copy."""
+    data = request.json
+    path = data.get('path')
+
+    if not path:
+        return jsonify({'success': False, 'error': 'Path is required'}), 400
+
+    # Expand user path
+    path = os.path.expanduser(path)
+    path = os.path.abspath(path)
+
+    # Update SVN manager
+    global svn_manager
+    manager = get_svn_manager()
+
+    if manager.set_working_copy(path):
+        # Save to config
+        config = load_config()
+        config['active_working_copy_path'] = path
+        save_config(config)
+
+        return jsonify({
+            'success': True,
+            'path': path
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid SVN working copy path'
+        }), 400
 
 
 @app.route('/api/externals')
