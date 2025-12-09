@@ -662,10 +662,11 @@ class SVNManager:
 
         try:
             # Build command to open properties dialog for svn:externals
+            # Note: Path must be quoted to ensure TortoiseSVN parses it correctly
             cmd = [
                 tortoise_path,
                 "/command:properties",
-                f"/path:{full_path}",
+                f'/path:"{full_path}"',
                 "/property:svn:externals"
             ]
 
