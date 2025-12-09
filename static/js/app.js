@@ -480,7 +480,7 @@ function renderTable() {
         let propertiesButton = '';
         if (tortoiseSvnAvailable) {
             propertiesButton = `
-                <button class="btn btn-sm btn-secondary" onclick="openTortoiseSvnProperties('${escapeHtml(external.parent_path)}')" title="Open TortoiseSVN Properties">
+                <button class="btn btn-sm btn-secondary" onclick="openTortoiseSvnProperties('${escapeForOnclick(external.parent_path)}')" title="Open TortoiseSVN Properties">
                     <i class="fas fa-cog"></i> Properties
                 </button>
             `;
@@ -975,4 +975,15 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Escape string for use in onclick attributes
+ * Escapes both HTML special chars and backslashes for JavaScript
+ */
+function escapeForOnclick(text) {
+    // First escape backslashes for JavaScript string literals
+    const escapedBackslashes = text.replace(/\\/g, '\\\\');
+    // Then escape HTML special characters
+    return escapeHtml(escapedBackslashes);
 }
