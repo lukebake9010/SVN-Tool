@@ -646,8 +646,8 @@ class SVNManager:
         if not tortoise_path:
             return False, "TortoiseSVN not found. Please install TortoiseSVN."
 
-        # Build full path
-        full_path = os.path.join(self.working_copy_path, parent_path)
+        # Build full path and normalize it (converts forward slashes to backslashes on Windows)
+        full_path = os.path.normpath(os.path.join(self.working_copy_path, parent_path))
 
         # Ensure path exists
         if not os.path.exists(full_path):
