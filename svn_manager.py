@@ -562,3 +562,117 @@ class SVNManager:
 
         except subprocess.SubprocessError as e:
             return {'error': str(e)}
+
+    def check_tortoisesvn_available(self) -> bool:
+        """
+        Check if TortoiseSVN is available on the system.
+
+        Returns:
+            True if TortoiseSVN is available, False otherwise
+        """
+        import platform
+
+        # TortoiseSVN is Windows-only
+        if platform.system() != 'Windows':
+            return False
+
+        try:
+            # Try to find TortoiseProc.exe in common locations
+            common_paths = [
+                r"C:\Program Files\TortoiseSVN\bin\TortoiseProc.exe",
+                r"C:\Program Files (x86)\TortoiseSVN\bin\TortoiseProc.exe"
+            ]
+
+            for path in common_paths:
+                if os.path.exists(path):
+                    return True
+
+            # Try to execute it (in case it's in PATH)
+            result = subprocess.run(
+                ["TortoiseProc.exe", "/command:about"],
+                capture_output=True,
+                timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            return result.returncode == 0
+
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
+
+    def get_tortoisesvn_path(self) -> Optional[str]:
+        """
+        Get the path to TortoiseProc.exe.
+
+        Returns:
+            Path to TortoiseProc.exe or None if not found
+        """
+        import platform
+
+        # TortoiseSVN is Windows-only
+        if platform.system() != 'Windows':
+            return None
+
+        # Try common installation paths
+        common_paths = [
+            r"C:\Program Files\TortoiseSVN\bin\TortoiseProc.exe",
+            r"C:\Program Files (x86)\TortoiseSVN\bin\TortoiseProc.exe"
+        ]
+
+        for path in common_paths:
+            if os.path.exists(path):
+                return path
+
+        # If not found in common paths, assume it's in PATH
+        return "TortoiseProc.exe"
+
+    def open_tortoisesvn_properties(self, parent_path: str) -> Tuple[bool, str]:
+        """
+        Open TortoiseSVN properties dialog for a specific path.
+
+        Args:
+            parent_path: The path of the folder containing the svn:externals property
+
+        Returns:
+            Tuple of (success, message)
+        """
+        import platform
+
+        # Check if Windows
+        if platform.system() != 'Windows':
+            return False, "TortoiseSVN is only available on Windows"
+
+        # Get TortoiseProc.exe path
+        tortoise_path = self.get_tortoisesvn_path()
+        if not tortoise_path:
+            return False, "TortoiseSVN not found. Please install TortoiseSVN."
+
+        # Build full path
+        full_path = os.path.join(self.working_copy_path, parent_path)
+
+        # Ensure path exists
+        if not os.path.exists(full_path):
+            return False, f"Path does not exist: {full_path}"
+
+        try:
+            # Build command to open properties dialog for svn:externals
+            cmd = [
+                tortoise_path,
+                "/command:properties",
+                f"/path:{full_path}",
+                "/property:svn:externals"
+            ]
+
+            print(f"Executing TortoiseSVN command: {' '.join(cmd)}")
+
+            # Execute command (don't wait for it to complete)
+            # Use CREATE_NO_WINDOW to prevent console window from appearing
+            subprocess.Popen(
+                cmd,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+
+            return True, "TortoiseSVN properties dialog opened successfully"
+
+        except Exception as e:
+            print(f"Error opening TortoiseSVN properties: {e}")
+            return False, f"Error opening TortoiseSVN: {str(e)}"

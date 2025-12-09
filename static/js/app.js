@@ -11,6 +11,7 @@ let autoRefreshInterval = null;
 let currentChangelog = { logs: [], format: 'plain' };
 let workingCopies = [];
 let activeWorkingCopyPath = null;
+let tortoiseSvnAvailable = false;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -23,6 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     // Check SVN status
     checkStatus();
+
+    // Check TortoiseSVN availability
+    checkTortoiseSvnAvailability();
 
     // Load working copies
     loadWorkingCopies();
@@ -144,6 +148,50 @@ async function checkStatus() {
 
     } catch (error) {
         console.error('Error checking status:', error);
+    }
+}
+
+/**
+ * Check if TortoiseSVN is available
+ */
+async function checkTortoiseSvnAvailability() {
+    try {
+        const response = await fetch('/api/tortoisesvn/available');
+        const data = await response.json();
+
+        if (data.success) {
+            tortoiseSvnAvailable = data.available;
+            console.log('TortoiseSVN available:', tortoiseSvnAvailable);
+        }
+    } catch (error) {
+        console.error('Error checking TortoiseSVN availability:', error);
+        tortoiseSvnAvailable = false;
+    }
+}
+
+/**
+ * Open TortoiseSVN properties dialog for a specific external
+ */
+async function openTortoiseSvnProperties(parentPath) {
+    try {
+        const response = await fetch('/api/tortoisesvn/properties', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ parent_path: parentPath })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.message || 'Failed to open TortoiseSVN properties', 'error');
+        }
+    } catch (error) {
+        console.error('Error opening TortoiseSVN properties:', error);
+        showToast('Error opening TortoiseSVN properties', 'error');
     }
 }
 
@@ -428,6 +476,16 @@ function renderTable() {
             `;
         }
 
+        // Create TortoiseSVN Properties button if available
+        let propertiesButton = '';
+        if (tortoiseSvnAvailable) {
+            propertiesButton = `
+                <button class="btn btn-sm btn-secondary" onclick="openTortoiseSvnProperties('${escapeHtml(external.parent_path)}')" title="Open TortoiseSVN Properties">
+                    <i class="fas fa-cog"></i> Properties
+                </button>
+            `;
+        }
+
         return `
             <tr class="external-row status-${statusClass}" data-path="${external.path}">
                 <td>
@@ -450,6 +508,7 @@ function renderTable() {
                 </td>
                 <td>
                     ${viewLogButton}
+                    ${propertiesButton}
                 </td>
             </tr>
         `;
