@@ -47,6 +47,18 @@
                 </div>
             </div>
 
+            <!-- Working Copy Tabs -->
+            <div id="workingCopyTabs" class="working-copy-tabs" style="display: none;">
+                <div class="tabs-container">
+                    <div id="tabsList" class="tabs-list">
+                        <!-- Tabs will be dynamically inserted here -->
+                    </div>
+                    <button id="refreshTabsBtn" class="tab-button tab-refresh" title="Refresh working copies">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
             <!-- Search and Filters -->
             <div class="controls-bar">
                 <div class="search-box">
@@ -176,8 +188,22 @@
             <div class="modal-body">
                 <form id="settingsForm">
                     <div class="form-group">
+                        <label for="projectsDirectoryInput">
+                            <i class="fas fa-folder-open"></i> Projects Directory
+                        </label>
+                        <div class="input-with-button">
+                            <input type="text" id="projectsDirectoryInput" class="form-control"
+                                   placeholder="/path/to/projects">
+                            <button type="button" id="setProjectsDirectoryBtn" class="btn btn-secondary">
+                                Set Directory
+                            </button>
+                        </div>
+                        <small class="form-help">Directory containing multiple SVN working copies - all subdirectories with .svn folders will appear as tabs</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="workingCopyInput">
-                            <i class="fas fa-folder"></i> Working Copy Path
+                            <i class="fas fa-folder"></i> Single Working Copy Path (Optional)
                         </label>
                         <div class="input-with-button">
                             <input type="text" id="workingCopyInput" class="form-control"
@@ -186,7 +212,7 @@
                                 Set Path
                             </button>
                         </div>
-                        <small class="form-help">Path to your SVN working copy directory</small>
+                        <small class="form-help">Use this if you want to work with a single working copy without using the projects directory</small>
                     </div>
 
                     <div class="form-group">

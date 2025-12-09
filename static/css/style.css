@@ -164,6 +164,98 @@ body {
 }
 
 /* ==========================================================================
+   Working Copy Tabs
+   ========================================================================== */
+
+.working-copy-tabs {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.tabs-container {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.tabs-list {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--spacing-xs) 0;
+}
+
+.tab-button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-height: 32px;
+}
+
+.tab-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-dark);
+    color: var(--text-primary);
+}
+
+.tab-button.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+}
+
+.tab-button.active:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.tab-refresh {
+    flex-shrink: 0;
+}
+
+.tab-refresh i {
+    font-size: 0.875rem;
+}
+
+/* Scrollbar styling for tabs */
+.tabs-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.tabs-list::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.tabs-list::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: var(--radius-sm);
+}
+
+.tabs-list::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
+}
+
+/* ==========================================================================
    Controls Bar
    ========================================================================== */
 
