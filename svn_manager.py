@@ -626,12 +626,13 @@ class SVNManager:
         # If not found in common paths, assume it's in PATH
         return "TortoiseProc.exe"
 
-    def open_tortoisesvn_properties(self, parent_path: str) -> Tuple[bool, str]:
+    def open_tortoisesvn_properties(self, parent_path: str, open_externals: bool = False) -> Tuple[bool, str]:
         """
         Open TortoiseSVN properties dialog for a specific path.
 
         Args:
             parent_path: The path of the folder containing the svn:externals property
+            open_externals: If True, opens the externals-specific property editor
 
         Returns:
             Tuple of (success, message)
@@ -650,6 +651,7 @@ class SVNManager:
         # Debug logging
         print(f"DEBUG: parent_path received: '{parent_path}'")
         print(f"DEBUG: working_copy_path: '{self.working_copy_path}'")
+        print(f"DEBUG: open_externals: {open_externals}")
 
         # Build full path and normalize it (converts forward slashes to backslashes on Windows)
         full_path = os.path.normpath(os.path.join(self.working_copy_path, parent_path))
@@ -668,6 +670,10 @@ class SVNManager:
                 "/command:properties",
                 f'/path:"{full_path}"'
             ]
+
+            # Add /property:svn:externals to open externals-specific editor
+            if open_externals:
+                cmd_parts.append("/property:svn:externals")
 
             cmd_string = ' '.join(cmd_parts)
             print(f"Executing TortoiseSVN command: {cmd_string}")

@@ -12,6 +12,7 @@ let currentChangelog = { logs: [], format: 'plain' };
 let workingCopies = [];
 let activeWorkingCopyPath = null;
 let tortoiseSvnAvailable = false;
+let shiftKeyPressed = false;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -122,6 +123,21 @@ function setupEventListeners() {
             e.target.style.display = 'none';
         }
     });
+
+    // Track shift key for changing Properties button behavior
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Shift' && !shiftKeyPressed) {
+            shiftKeyPressed = true;
+            renderTable(); // Re-render to update button text
+        }
+    });
+
+    document.addEventListener('keyup', function(e) {
+        if (e.key === 'Shift' && shiftKeyPressed) {
+            shiftKeyPressed = false;
+            renderTable(); // Re-render to update button text
+        }
+    });
 }
 
 /**
@@ -172,14 +188,17 @@ async function checkTortoiseSvnAvailability() {
 /**
  * Open TortoiseSVN properties dialog for a specific external
  */
-async function openTortoiseSvnProperties(parentPath) {
+async function openTortoiseSvnProperties(parentPath, openExternals = false) {
     try {
         const response = await fetch('/api/tortoisesvn/properties', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ parent_path: parentPath })
+            body: JSON.stringify({
+                parent_path: parentPath,
+                open_externals: openExternals
+            })
         });
 
         const data = await response.json();
@@ -479,9 +498,14 @@ function renderTable() {
         // Create TortoiseSVN Properties button if available
         let propertiesButton = '';
         if (tortoiseSvnAvailable) {
+            const buttonText = shiftKeyPressed ? 'Externals' : 'Properties';
+            const buttonIcon = shiftKeyPressed ? 'fa-external-link-alt' : 'fa-cog';
+            const buttonTitle = shiftKeyPressed ? 'Open TortoiseSVN Externals Editor' : 'Open TortoiseSVN Properties';
+            const openExternalsParam = shiftKeyPressed ? 'true' : 'false';
+
             propertiesButton = `
-                <button class="btn btn-sm btn-secondary" onclick="openTortoiseSvnProperties('${escapeForOnclick(external.parent_path)}')" title="Open TortoiseSVN Properties">
-                    <i class="fas fa-cog"></i> Properties
+                <button class="btn btn-sm btn-secondary" onclick="openTortoiseSvnProperties('${escapeForOnclick(external.parent_path)}', ${openExternalsParam})" title="${buttonTitle}">
+                    <i class="fas ${buttonIcon}"></i> ${buttonText}
                 </button>
             `;
         }
