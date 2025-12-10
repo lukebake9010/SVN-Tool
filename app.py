@@ -440,9 +440,11 @@ def api_open_tortoisesvn_properties():
 
     Body:
         parent_path: The path of the folder containing svn:externals
+        open_externals: Boolean, if True opens the externals-specific editor
     """
     data = request.json
     parent_path = data.get('parent_path')
+    open_externals = data.get('open_externals', False)
 
     if not parent_path:
         return jsonify({
@@ -453,7 +455,7 @@ def api_open_tortoisesvn_properties():
     manager = get_svn_manager()
 
     try:
-        success, message = manager.open_tortoisesvn_properties(parent_path)
+        success, message = manager.open_tortoisesvn_properties(parent_path, open_externals)
 
         return jsonify({
             'success': success,
