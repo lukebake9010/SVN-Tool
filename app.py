@@ -415,6 +415,58 @@ def api_format_log():
         }), 500
 
 
+@app.route('/api/tortoisesvn/available', methods=['GET'])
+def api_tortoisesvn_available():
+    """Check if TortoiseSVN is available on the system."""
+    manager = get_svn_manager()
+
+    try:
+        is_available = manager.check_tortoisesvn_available()
+        return jsonify({
+            'success': True,
+            'available': is_available
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/tortoisesvn/properties', methods=['POST'])
+def api_open_tortoisesvn_properties():
+    """
+    Open TortoiseSVN properties dialog for a specific path.
+
+    Body:
+        parent_path: The path of the folder containing svn:externals
+    """
+    data = request.json
+    parent_path = data.get('parent_path')
+
+    if not parent_path:
+        return jsonify({
+            'success': False,
+            'error': 'parent_path is required'
+        }), 400
+
+    manager = get_svn_manager()
+
+    try:
+        success, message = manager.open_tortoisesvn_properties(parent_path)
+
+        return jsonify({
+            'success': success,
+            'message': message
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # Error handlers
 
 @app.errorhandler(404)
