@@ -662,12 +662,11 @@ class SVNManager:
 
         try:
             # Build command to open properties dialog
-            # Note: Path must be quoted to ensure TortoiseSVN parses it correctly
-            # We don't specify /property:svn:externals to avoid fallback issues
+            # When using a list with subprocess.Popen, Python handles quoting automatically
             cmd = [
                 tortoise_path,
                 "/command:properties",
-                f'/path:"{full_path}"'
+                f'/path:{full_path}'
             ]
 
             print(f"Executing TortoiseSVN command: {' '.join(cmd)}")
