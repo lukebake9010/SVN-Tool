@@ -662,19 +662,21 @@ class SVNManager:
 
         try:
             # Build command to open properties dialog
-            # When using a list with subprocess.Popen, Python handles quoting automatically
-            cmd = [
-                tortoise_path,
+            # Build as list for readability, then join for execution
+            cmd_parts = [
+                f'"{tortoise_path}"',
                 "/command:properties",
-                f'/path:{full_path}'
+                f'/path:"{full_path}"'
             ]
 
-            print(f"Executing TortoiseSVN command: {' '.join(cmd)}")
+            cmd_string = ' '.join(cmd_parts)
+            print(f"Executing TortoiseSVN command: {cmd_string}")
 
-            # Execute command (don't wait for it to complete)
+            # Execute command as string (don't wait for it to complete)
             # Use CREATE_NO_WINDOW to prevent console window from appearing
             subprocess.Popen(
-                cmd,
+                cmd_string,
+                shell=True,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
 
