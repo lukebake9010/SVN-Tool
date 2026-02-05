@@ -32,8 +32,8 @@ function initializeApp() {
     // Load working copies
     loadWorkingCopies();
 
-    // Restore filter state from localStorage before loading externals
-    restoreFilterState();
+    // Restore saved UI state from localStorage
+    restoreSavedState();
 
     // Load externals
     loadExternals();
@@ -558,6 +558,13 @@ function saveFilterState() {
         showError: document.getElementById('filterError').checked
     };
     localStorage.setItem('svnFilterState', JSON.stringify(filterState));
+}
+
+/**
+ * Restore all saved UI state from localStorage
+ */
+function restoreSavedState() {
+    restoreFilterState();
 }
 
 /**
