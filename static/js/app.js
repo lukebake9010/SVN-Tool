@@ -807,10 +807,11 @@ async function copyChangelog() {
 }
 
 /**
- * Refresh the current changelog by re-fetching from SVN
+ * Refresh the current changelog by re-reading external state from SVN
+ * and fetching the changelog with updated revision values.
  */
 async function refreshChangelog() {
-    if (!currentChangelog.url) {
+    if (!currentChangelog.name) {
         showToast('No changelog to refresh', 'warning');
         return;
     }
@@ -818,6 +819,7 @@ async function refreshChangelog() {
     const btn = document.getElementById('refreshChangelogBtn');
     const content = document.getElementById('changelogContent');
     const formatSelect = document.getElementById('formatSelect');
+    const revRangeElement = document.getElementById('changelogRevRange');
 
     // Disable button and show spinning icon
     btn.disabled = true;
@@ -826,22 +828,58 @@ async function refreshChangelog() {
     // Show loading in content area
     content.innerHTML = `
         <div class="loading-spinner">
-            <i class="fas fa-spinner fa-spin"></i> Refreshing changelog...
+            <i class="fas fa-spinner fa-spin"></i> Re-reading externals and fetching changelog...
         </div>
     `;
 
     try {
-        const format = formatSelect.value;
-        const response = await fetch(`/api/log?url=${encodeURIComponent(currentChangelog.url)}&old_rev=${currentChangelog.oldRev}&new_rev=${currentChangelog.newRev}&format=${format}`);
-        const data = await response.json();
+        // Step 1: Re-read externals to get updated revision state
+        const externalsResponse = await fetch('/api/externals');
+        const externalsData = await externalsResponse.json();
 
-        if (data.success) {
-            currentChangelog.logs = data.logs;
-            currentChangelog.format = data.format;
-            displayChangelog(data.logs, data.formatted);
+        if (!externalsData.success) {
+            throw new Error(externalsData.error || 'Failed to refresh externals');
+        }
+
+        // Step 2: Find the matching external by name and URL
+        const external = externalsData.externals.find(ext =>
+            ext.name === currentChangelog.name &&
+            ext.url === currentChangelog.url
+        );
+
+        if (!external) {
+            throw new Error(`External "${currentChangelog.name}" no longer found`);
+        }
+
+        // Step 3: Derive updated oldRev/newRev using the same logic as the table
+        let oldRev = external.revision;
+        let newRev = 'HEAD';
+
+        if (external.change_details && external.status === 'changed') {
+            if (external.change_details.revision) {
+                oldRev = external.change_details.revision.old;
+                newRev = external.change_details.revision.new;
+            }
+        }
+
+        // Step 4: Update stored parameters and revision display
+        currentChangelog.url = external.url;
+        currentChangelog.oldRev = oldRev;
+        currentChangelog.newRev = newRev;
+        revRangeElement.textContent = `r${oldRev}:${newRev}`;
+
+        // Step 5: Fetch the changelog with updated revisions
+        const format = formatSelect.value;
+        const logResponse = await fetch(`/api/log?url=${encodeURIComponent(external.url)}&old_rev=${oldRev}&new_rev=${newRev}&format=${format}`);
+        const logData = await logResponse.json();
+
+        if (logData.success) {
+            currentChangelog.logs = logData.logs;
+            currentChangelog.format = logData.format;
+            displayChangelog(logData.logs, logData.formatted);
             showToast('Changelog refreshed', 'success');
         } else {
-            throw new Error(data.error || 'Failed to refresh changelog');
+            throw new Error(logData.error || 'Failed to fetch changelog');
         }
 
     } catch (error) {
