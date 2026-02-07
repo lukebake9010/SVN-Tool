@@ -423,6 +423,36 @@ body {
     font-weight: 500;
 }
 
+/* ==========================================================================
+   Nested Externals
+   ========================================================================== */
+
+.nested-external {
+    background-color: rgba(0, 0, 0, 0.015);
+}
+
+.nested-external:hover {
+    background-color: rgba(0, 0, 0, 0.035);
+}
+
+.nested-depth-1 td:first-child {
+    padding-left: calc(var(--spacing-md) + 1.5rem);
+}
+
+.nested-depth-2 td:first-child {
+    padding-left: calc(var(--spacing-md) + 3rem);
+}
+
+.nested-depth-3 td:first-child {
+    padding-left: calc(var(--spacing-md) + 4.5rem);
+}
+
+.nesting-indicator {
+    color: var(--text-light);
+    margin-right: var(--spacing-xs);
+    font-size: 0.8rem;
+}
+
 .external-url {
     max-width: 400px;
     overflow: hidden;

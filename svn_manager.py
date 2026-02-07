@@ -71,20 +71,26 @@ class SVNManager:
 
                 # Determine status based on definition changes
                 external['status'], external['change_details'] = self._get_external_status(external, base_external)
+                external['depth'] = 0
+                external['parent_external'] = None
                 externals.append(external)
+
+            # Collect nested externals (externals within externals)
+            externals = self._collect_nested_externals(externals)
 
         except subprocess.SubprocessError as e:
             print(f"Error getting externals: {e}")
 
         return externals
 
-    def _get_externals_from_propget(self, path: str, pristine: bool = False) -> List[Dict]:
+    def _get_externals_from_propget(self, path: str, pristine: bool = False, cwd: str = None) -> List[Dict]:
         """
         Get externals from svn propget command.
 
         Args:
             path: Path to query
             pristine: If True, get BASE (pristine) version, otherwise get working version
+            cwd: Working directory for the SVN command (defaults to self.working_copy_path)
 
         Returns:
             List of external definitions
@@ -102,7 +108,7 @@ class SVNManager:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                cwd=self.working_copy_path
+                cwd=cwd or self.working_copy_path
             )
 
             if result.returncode != 0:
@@ -292,6 +298,90 @@ class SVNManager:
         except Exception as e:
             print(f"Error getting external status: {e}")
             return 'error', None
+
+    def _collect_nested_externals(self, externals: List[Dict], max_depth: int = 5) -> List[Dict]:
+        """
+        Recursively collect nested externals (externals defined within externals).
+
+        For each external that has a checked-out directory with its own svn:externals,
+        this method discovers those nested definitions and inserts them right after
+        their parent in the returned list.
+
+        Args:
+            externals: List of external dicts (must already have 'depth' and 'parent_external' set)
+            max_depth: Maximum nesting depth to prevent infinite recursion
+
+        Returns:
+            New list with nested externals inserted after their parents
+        """
+        result = []
+
+        for external in externals:
+            result.append(external)
+
+            if external['depth'] >= max_depth:
+                continue
+
+            # Check if the external's checkout directory exists and is an SVN working copy
+            ext_full_path = os.path.join(self.working_copy_path, external['path'])
+            svn_dir = os.path.join(ext_full_path, '.svn')
+
+            if not os.path.isdir(ext_full_path) or not os.path.isdir(svn_dir):
+                continue
+
+            try:
+                # Get working and BASE externals from the nested working copy
+                nested_working = self._get_externals_from_propget(
+                    ext_full_path, pristine=False, cwd=ext_full_path
+                )
+                nested_base = self._get_externals_from_propget(
+                    ext_full_path, pristine=True, cwd=ext_full_path
+                )
+
+                # Adjust paths for both working and base to be relative to the main working copy
+                for ext in nested_working:
+                    if ext['parent_path'] == '.':
+                        ext['parent_path'] = external['path']
+                    else:
+                        ext['parent_path'] = os.path.join(external['path'], ext['parent_path'])
+                    ext['path'] = os.path.join(external['path'], ext['path'])
+
+                for ext in nested_base:
+                    if ext['parent_path'] == '.':
+                        ext['parent_path'] = external['path']
+                    else:
+                        ext['parent_path'] = os.path.join(external['path'], ext['parent_path'])
+                    ext['path'] = os.path.join(external['path'], ext['path'])
+
+                # Build base lookup (after path adjustment so keys match)
+                nested_base_lookup = {}
+                for ext in nested_base:
+                    key = f"{ext['parent_path']}:{ext['name']}"
+                    nested_base_lookup[key] = ext
+
+                # Process nested working externals
+                nested_externals = []
+                for nested_ext in nested_working:
+                    key = f"{nested_ext['parent_path']}:{nested_ext['name']}"
+                    nested_base_ext = nested_base_lookup.get(key)
+
+                    nested_ext['status'], nested_ext['change_details'] = self._get_external_status(
+                        nested_ext, nested_base_ext
+                    )
+                    nested_ext['depth'] = external['depth'] + 1
+                    nested_ext['parent_external'] = external['path']
+
+                    nested_externals.append(nested_ext)
+
+                # Recursively collect deeper nested externals
+                if nested_externals:
+                    nested_externals = self._collect_nested_externals(nested_externals, max_depth)
+                    result.extend(nested_externals)
+
+            except Exception as e:
+                print(f"Error collecting nested externals for {external['path']}: {e}")
+
+        return result
 
     def get_changed_externals(self) -> List[Dict]:
         """
