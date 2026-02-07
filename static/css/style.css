@@ -400,6 +400,11 @@ body {
     vertical-align: middle;
 }
 
+.data-table td:first-child {
+    max-width: 0;
+    overflow: hidden;
+}
+
 .data-table td:last-child {
     white-space: nowrap;
 }
@@ -408,12 +413,18 @@ body {
     font-weight: 500;
     color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .external-path {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .change-details {
@@ -458,7 +469,7 @@ body {
 }
 
 .external-url {
-    max-width: 400px;
+    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
