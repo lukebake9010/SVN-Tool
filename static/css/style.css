@@ -343,7 +343,6 @@ body {
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
 }
 
 .data-table thead {
@@ -357,11 +356,6 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
-    width: 1%; /* shrink-to-fit by default; Name/Path overrides below */
-}
-
-.data-table th:first-child {
-    width: auto; /* Name/Path absorbs remaining space and truncates first */
 }
 
 .data-table th.sortable {
@@ -414,18 +408,12 @@ body {
     font-weight: 500;
     color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .external-path {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .change-details {
