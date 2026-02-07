@@ -1,10 +1,11 @@
 """
 SVN External Manager - System Tray Application
 
-Runs the Flask server in the background with a system tray icon.
-Replaces the visible cmd window with a tray icon that provides:
+Runs the Flask server entirely in the background with a system tray icon.
+No console window is shown. Launched via pythonw (run_tray.bat).
+
+Tray menu:
   - Open in Browser
-  - Show/Hide Console (for debug output)
   - Restart Server
   - Quit
 """
@@ -14,31 +15,6 @@ import os
 import threading
 import webbrowser
 import logging
-
-# Platform-specific console window control (Windows only)
-if sys.platform == 'win32':
-    import ctypes
-
-    SW_HIDE = 0
-    SW_SHOW = 5
-
-    def _get_console_hwnd():
-        return ctypes.windll.kernel32.GetConsoleWindow()
-
-    def _set_console_visible(visible):
-        hwnd = _get_console_hwnd()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW if visible else SW_HIDE)
-
-    def _is_console_visible():
-        hwnd = _get_console_hwnd()
-        return bool(hwnd and ctypes.windll.user32.IsWindowVisible(hwnd))
-else:
-    def _set_console_visible(visible):
-        pass
-
-    def _is_console_visible():
-        return False
 
 import pystray
 from PIL import Image, ImageDraw, ImageFont
@@ -82,7 +58,6 @@ class SVNTrayApp:
         self.server = None
         self.server_thread = None
         self.icon = None
-        self.console_visible = False
         self._setup_logging()
 
     # ── logging ──────────────────────────────────────────────
@@ -93,15 +68,10 @@ class SVNTrayApp:
         root = logging.getLogger()
         root.setLevel(logging.INFO)
 
-        # File handler – always active
+        # File handler – all output goes here (no console)
         fh = logging.FileHandler(LOG_FILE, encoding='utf-8')
         fh.setFormatter(log_fmt)
         root.addHandler(fh)
-
-        # Console handler – visible when console is shown
-        ch = logging.StreamHandler(sys.stdout)
-        ch.setFormatter(log_fmt)
-        root.addHandler(ch)
 
         # Capture werkzeug request logs too
         logging.getLogger('werkzeug').setLevel(logging.INFO)
@@ -137,11 +107,6 @@ class SVNTrayApp:
     def _open_browser(self):
         webbrowser.open(f'http://localhost:{PORT}')
 
-    def _toggle_console(self):
-        self.console_visible = not self.console_visible
-        _set_console_visible(self.console_visible)
-        self.icon.update_menu()
-
     def _quit(self):
         logging.info('Shutting down SVN Tool...')
         self._stop_server()
@@ -151,36 +116,16 @@ class SVNTrayApp:
     # ── tray menu ────────────────────────────────────────────
 
     def _build_menu(self):
-        items = [
+        return pystray.Menu(
             pystray.MenuItem('Open in Browser', lambda: self._open_browser(),
                              default=True),
-        ]
-
-        # Console toggle is only useful on Windows
-        if sys.platform == 'win32':
-            items.append(
-                pystray.MenuItem(
-                    lambda item: 'Hide Console' if self.console_visible
-                                 else 'Show Console',
-                    lambda: self._toggle_console(),
-                )
-            )
-
-        items.extend([
             pystray.MenuItem('Restart Server', lambda: self._restart_server()),
             pystray.MenuItem('Quit', lambda: self._quit()),
-        ])
-
-        return pystray.Menu(*items)
+        )
 
     # ── entry point ──────────────────────────────────────────
 
     def run(self):
-        # Hide the console window immediately on Windows
-        if sys.platform == 'win32':
-            _set_console_visible(False)
-            self.console_visible = False
-
         self._start_server()
         self._open_browser()
 

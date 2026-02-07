@@ -35,7 +35,6 @@ if errorlevel 1 (
     echo.
 )
 
-REM Launch the tray app.
-REM Using "python" (not "pythonw") so a console window exists for the
-REM Show/Hide Console toggle.  The tray app hides it immediately on startup.
-python tray_app.py
+REM Launch the tray app with pythonw (no console window).
+REM All logging goes to svn_tool.log.
+start "" pythonw tray_app.py
