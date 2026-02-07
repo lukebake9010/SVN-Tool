@@ -236,6 +236,49 @@ body {
     font-size: 0.875rem;
 }
 
+/* Tab status color-coding */
+.tab-button.tab-status-clean {
+    border-bottom: 3px solid var(--success-color);
+}
+
+.tab-button.tab-status-changed {
+    border-bottom: 3px solid var(--warning-color);
+}
+
+.tab-button.tab-status-error {
+    border-bottom: 3px solid var(--error-color);
+}
+
+.tab-button.active.tab-status-clean {
+    background: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.tab-button.active.tab-status-clean:hover {
+    background: #059669;
+    border-color: #059669;
+}
+
+.tab-button.active.tab-status-changed {
+    background: var(--warning-color);
+    border-color: var(--warning-color);
+}
+
+.tab-button.active.tab-status-changed:hover {
+    background: #d97706;
+    border-color: #d97706;
+}
+
+.tab-button.active.tab-status-error {
+    background: var(--error-color);
+    border-color: var(--error-color);
+}
+
+.tab-button.active.tab-status-error:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
 /* Scrollbar styling for tabs */
 .tabs-list::-webkit-scrollbar {
     height: 6px;
