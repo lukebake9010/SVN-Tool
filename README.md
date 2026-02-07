@@ -1,405 +1,232 @@
-# SVN External Manager - Web GUI Application
+# SVN External Manager
 
-A modern, web-based tool for managing SVN externals with a focus on quickly viewing and copying changelogs. This application provides a clean, intuitive interface for browsing externals, viewing their status, and accessing detailed changelog information.
+A web-based tool for managing SVN externals. View external definitions, detect changes, and copy changelogs in multiple formats.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Python](https://img.shields.io/badge/python-3.7+-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
-### 🎯 Core Functionality
+- Auto-detect and display all SVN externals from a working copy
+- Change detection: compares working vs BASE definitions to flag changed, new, or missing externals
+- Changelog viewer with Plain Text, Markdown, Commit, and TortoiseSVN formats
+- One-click copy to clipboard
+- Multiple working copy support via a projects directory (tab-based switching)
+- TortoiseSVN properties dialog integration (Windows)
+- Search, filter by status, and sort columns
+- Auto-refresh at configurable intervals
+- Persistent settings saved to `config.json`
 
-- **Dashboard View**: Auto-detect and display all SVN externals from your working copy
-- **Smart Filtering**: Sort and filter externals by name, status, revision, or URL
-- **Status Tracking**: Real-time status indicators (Clean, Modified, Error, Missing)
-- **Instant Search**: Quickly find specific externals with live search
+## Prerequisites
 
-### 📊 Changelog Management
+- **Python 3.7+**
+- **Subversion (SVN) command-line client** (`svn` must be on your PATH)
+- An SVN working copy to point the tool at
 
-- **One-Click Changelog**: View detailed commit history for any external
-- **Multiple Formats**: Export changelogs in Plain Text, Markdown, or Commit Format
-- **Copy to Clipboard**: Instantly copy formatted changelogs with a single click
-- **Manual Lookup**: Fetch logs for custom URL and revision ranges
-
-### ⚙️ Configuration
-
-- **Working Copy Selection**: Easily switch between different SVN working copies
-- **Auto-Refresh**: Optionally auto-refresh externals at configurable intervals
-- **Persistent Settings**: All preferences are saved automatically
-
-### 🎨 User Experience
-
-- **Modern UI**: Clean, responsive design that works on desktop and mobile
-- **Dark Header**: Easy-on-the-eyes interface with professional styling
-- **Toast Notifications**: Non-intrusive feedback for all operations
-- **Keyboard Shortcuts**: Efficient navigation and actions
-
-## Screenshots
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-
-### Changelog Viewer
-![Changelog](docs/screenshots/changelog.png)
-
-## Installation
-
-### Prerequisites
-
-- Python 3.7 or higher
-- Subversion (SVN) command-line client
-- A valid SVN working copy
-
-### Step 1: Install SVN
-
-Make sure you have Subversion installed and accessible from your command line:
+### Installing SVN
 
 ```bash
-# Check if SVN is installed
+# Check if SVN is already installed
 svn --version
 
-# If not installed:
 # Ubuntu/Debian
 sudo apt-get install subversion
 
-# macOS (with Homebrew)
+# macOS (Homebrew)
 brew install subversion
 
-# Windows
-# Download from https://tortoisesvn.net/
+# Windows - install TortoiseSVN (includes command-line tools)
+# or use the standalone Subversion binaries
 ```
 
-### Step 2: Clone or Download
+## Installation
+
+### Quick start (recommended)
+
+The startup scripts create a virtual environment, install dependencies, and launch the server automatically.
+
+**Linux / macOS:**
 
 ```bash
 git clone <repository-url>
 cd SVN-Tool
+chmod +x run.sh
+./run.sh
 ```
 
-### Step 3: Install Python Dependencies
+**Windows:**
+
+```cmd
+git clone <repository-url>
+cd SVN-Tool
+run.bat
+```
+
+### Manual install
 
 ```bash
-# Create a virtual environment (recommended)
-python -m venv venv
+git clone <repository-url>
+cd SVN-Tool
 
-# Activate virtual environment
-# On Linux/macOS:
+# Create and activate a virtual environment
+python3 -m venv venv
+
+# Linux/macOS
 source venv/bin/activate
-# On Windows:
+
+# Windows
 venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Start the server
+python3 app.py
 ```
 
-## Usage
+> **Note:** On some systems the Python binary is named `python` instead of `python3`. Use whichever is available. The `run.sh` script uses `python3`; if your system only has `python`, edit the script or use the manual steps above.
 
-### Starting the Server
+The server starts on **http://localhost:5000**. It binds to `0.0.0.0`, so it is also reachable from other machines on the network. Keep this in mind if you are on a shared network -- this tool is intended for local use and has no authentication.
 
-```bash
-python app.py
-```
+## Getting started
 
-The application will start on `http://localhost:5000`. Open this URL in your web browser.
-
-```
-======================================================================
-SVN External Manager - Web Application
-======================================================================
-Starting server at http://localhost:5000
-Press Ctrl+C to stop
-======================================================================
-```
-
-### First Time Setup
-
-1. **Set Working Copy Path**
-   - Click the Settings icon (⚙️) in the header
-   - Enter the path to your SVN working copy
-   - Click "Set Path"
-
-2. **Load Externals**
-   - Click the "Refresh" button to scan for externals
-   - All externals will be displayed in the table
-
-3. **View Changelog**
-   - Click "View Log" on any external
-   - Select your preferred format (Plain, Markdown, or Commit)
-   - Click "Copy Changelog" to copy to clipboard
-
-### Features Guide
-
-#### Dashboard
-
-- **Search**: Type in the search box to filter externals by name, path, or URL
-- **Filters**: Toggle checkboxes to show/hide externals by status
-- **Sorting**: Click column headers to sort the table
-- **Refresh**: Click the refresh button to reload externals
-
-#### Viewing Changelogs
-
-1. Click "View Log" button on any external row
-2. The changelog modal will open showing all commits
-3. Use the format dropdown to change the output format:
-   - **Plain Text**: Simple, readable format
-   - **Markdown**: Formatted with Markdown headers
-   - **Commit Format**: Compact format suitable for commit messages
-4. Click "Copy Changelog" to copy to clipboard
-
-#### Settings
-
-Access settings by clicking the gear icon (⚙️):
-
-- **Working Copy Path**: Set or change your SVN working copy location
-- **Auto-Refresh**: Enable automatic refreshing of externals
-  - Set refresh interval (10-3600 seconds)
-- **Default Format**: Choose default changelog format
-
-## API Documentation
-
-The application provides a REST API for programmatic access.
-
-### Endpoints
-
-#### Get Status
-```
-GET /api/status
-```
-Returns SVN availability and working copy information.
-
-#### Get Externals
-```
-GET /api/externals
-```
-Returns all externals from the working copy.
-
-Response:
-```json
-{
-  "success": true,
-  "externals": [
-    {
-      "name": "external-name",
-      "path": "path/to/external",
-      "url": "https://svn.example.com/repo/path",
-      "revision": "1234",
-      "status": "clean"
-    }
-  ],
-  "count": 1,
-  "timestamp": "2025-12-08T12:00:00"
-}
-```
-
-#### Get Changelog
-```
-GET /api/log?url=<url>&old_rev=<rev>&new_rev=<rev>&format=<format>
-```
-
-Parameters:
-- `url`: SVN URL
-- `old_rev`: Starting revision number
-- `new_rev`: Ending revision number (or "HEAD")
-- `format`: Output format (plain, markdown, commit)
-
-Response:
-```json
-{
-  "success": true,
-  "logs": [
-    {
-      "revision": "1234",
-      "author": "user",
-      "date": "2025-12-08 12:00:00",
-      "message": "Commit message"
-    }
-  ],
-  "formatted": "Formatted changelog text",
-  "format": "plain",
-  "revision_range": "1234:1235"
-}
-```
-
-#### Set Working Copy
-```
-POST /api/working-copy
-Content-Type: application/json
-
-{
-  "path": "/path/to/working/copy"
-}
-```
-
-#### Update Configuration
-```
-POST /api/config
-Content-Type: application/json
-
-{
-  "auto_refresh": true,
-  "auto_refresh_interval": 60,
-  "default_format": "plain"
-}
-```
+1. Open `http://localhost:5000` in a browser.
+2. Click the **Settings** gear icon.
+3. Set your **Projects Directory** (a folder containing one or more SVN working copies). Each subdirectory with a `.svn` folder will appear as a tab.
+   - Alternatively, set a **Single Working Copy Path** if you only work with one checkout.
+4. Click **Refresh** to scan for externals.
+5. Click **View Log** on any external to see its changelog. Pick a format and click **Copy Changelog**.
 
 ## Configuration
 
-Configuration is stored in `config.json` (automatically created):
+Settings are persisted in `config.json` (auto-created, git-ignored). Current options:
 
-```json
-{
-  "working_copy_path": "/path/to/working/copy",
-  "auto_refresh": false,
-  "auto_refresh_interval": 60,
-  "default_format": "plain"
-}
-```
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `projects_directory` | string | — | Directory to scan for SVN working copies |
+| `active_working_copy_path` | string | cwd | Currently active working copy |
+| `auto_refresh` | bool | `false` | Enable periodic external refresh |
+| `auto_refresh_interval` | int | `60` | Refresh interval in seconds (10-3600) |
+| `default_format` | string | `"plain"` | Default changelog format |
+| `truncate_tortoise_messages` | bool | `true` | Truncate TortoiseSVN format to first line / 240 chars |
 
-## Project Structure
+## Changelog formats
+
+| Format | Description |
+|--------|-------------|
+| **Plain Text** | Verbose: revision, author, date, and full message per entry |
+| **Markdown** | Markdown-formatted with headers per revision |
+| **Commit** | Compact one-liner per revision, suitable for commit messages |
+| **TortoiseSVN** | Matches TortoiseSVN's log style (newest first, optional truncation) |
+
+## External status values
+
+| Status | Meaning |
+|--------|---------|
+| `clean` | Definition unchanged, directory exists |
+| `changed` | Definition modified (revision, URL, or path differs from BASE) |
+| `new` | External added (present in working copy but not in BASE) |
+| `missing` | Directory does not exist on disk |
+| `error` | Exception during status check |
+
+## API reference
+
+All endpoints return JSON. Success responses include `"success": true`; errors include `"success": false` and an `"error"` message.
+
+### Status and config
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/status` | SVN availability and working copy path |
+| GET | `/api/config` | Current configuration |
+| POST | `/api/config` | Update configuration (JSON body) |
+
+### Working copies
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/working-copy` | Set working copy path (`{"path": "..."}`) |
+| GET | `/api/working-copy/info` | SVN info for current working copy |
+| GET | `/api/working-copies` | List discovered working copies |
+| POST | `/api/working-copies/projects-directory` | Set projects directory (`{"path": "..."}`) |
+| POST | `/api/working-copies/activate` | Switch active working copy (`{"path": "..."}`) |
+
+### Externals
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/externals` | List all externals |
+| GET | `/api/changed-externals` | List externals with `changed` or `new` status |
+
+### Changelog
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/log?url=...&old_rev=...&new_rev=...&format=...` | Fetch SVN log between two revisions |
+| POST | `/api/log/format` | Re-format existing log entries (`{"logs": [...], "format": "..."}`) |
+
+### TortoiseSVN (Windows)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/tortoisesvn/available` | Check if TortoiseSVN is installed |
+| POST | `/api/tortoisesvn/properties` | Open TortoiseSVN properties dialog (`{"parent_path": "...", "open_externals": true}`) |
+
+## Project structure
 
 ```
 SVN-Tool/
-├── app.py                 # Flask application
-├── svn_manager.py         # SVN operations module
-├── requirements.txt       # Python dependencies
-├── config.json           # Configuration (auto-generated)
+├── app.py                      # Flask routes and API
+├── svn_manager.py              # SVN operations and business logic
+├── requirements.txt            # Python dependencies (Flask, Flask-CORS, Werkzeug)
+├── config.json                 # Runtime config (auto-generated, git-ignored)
+├── run.sh                      # Linux/macOS startup script
+├── run.bat                     # Windows startup script
 ├── templates/
-│   └── index.html        # Main HTML template
+│   └── index.html              # Single-page application
 ├── static/
 │   ├── css/
-│   │   └── style.css     # Stylesheet
+│   │   └── style.css           # Styles
 │   └── js/
-│       └── app.js        # Frontend JavaScript
-└── README.md             # This file
-```
-
-## Development
-
-### Running in Development Mode
-
-The application runs in debug mode by default when started with `python app.py`. This enables:
-
-- Auto-reload on code changes
-- Detailed error messages
-- Debug toolbar
-
-### Adding Features
-
-1. **Backend**: Modify `svn_manager.py` for SVN operations or `app.py` for API endpoints
-2. **Frontend**: Edit `static/js/app.js` for JavaScript logic
-3. **Styling**: Update `static/css/style.css` for appearance changes
-4. **HTML**: Modify `templates/index.html` for structure changes
-
-### Testing
-
-```bash
-# Test SVN integration
-python -c "from svn_manager import SVNManager; m = SVNManager('/path/to/wc'); print(m.get_externals())"
-
-# Test API endpoints
-curl http://localhost:5000/api/status
-curl http://localhost:5000/api/externals
+│       └── app.js              # Frontend logic
+├── test_external_detection.py  # Change detection test script
+├── debug_externals.py          # Debug/development utility
+├── CLAUDE.md                   # AI assistant guide
+└── LICENSE                     # MIT license
 ```
 
 ## Troubleshooting
 
-### SVN Not Available
+**"SVN Not Available" status badge**
+Verify `svn --version` works in your terminal. If you installed SVN after starting the server, restart it.
 
-**Problem**: "SVN Not Available" status badge
+**Empty externals list**
+Check that the working copy path is correct and that `svn:externals` properties are set. Test manually: `svn propget svn:externals -R /path/to/wc`.
 
-**Solution**:
-- Verify SVN is installed: `svn --version`
-- Ensure SVN is in your PATH
-- Restart the application after installing SVN
+**`python3: command not found` (Linux/macOS)**
+Some systems only have `python`. Edit `run.sh` to replace `python3` with `python`, or use the manual install steps with your available binary.
 
-### No Externals Found
+**`python: command not found` (Windows)**
+Ensure Python is on your PATH. If you installed from python.org, check the "Add to PATH" option during installation.
 
-**Problem**: Empty externals list
+**Port 5000 already in use**
+Another process is using port 5000. Find it with `lsof -i :5000` (Linux/macOS) or `netstat -ano | findstr :5000` (Windows) and stop it, or change the port in `app.py`.
 
-**Solution**:
-- Verify you're pointing to a valid SVN working copy
-- Check that the working copy has `svn:externals` properties
-- Run `svn propget svn:externals -R .` manually to verify
+**Changelog fetch fails**
+Verify network access to the SVN repository and that you have read permissions. Try a smaller revision range or specific revision numbers instead of `HEAD`.
 
-### Cannot Load Changelog
+## Development
 
-**Problem**: Error loading changelog
+The server runs in Flask debug mode (`debug=True`), so it auto-reloads on code changes.
 
-**Solution**:
-- Verify the SVN URL is accessible
-- Check network connectivity
-- Ensure you have permission to access the repository
-- Try with specific revision numbers instead of "HEAD"
+- SVN operations: `svn_manager.py`
+- API routes: `app.py`
+- Frontend logic: `static/js/app.js`
+- Styles: `static/css/style.css`
+- Page structure: `templates/index.html`
 
-### Port Already in Use
-
-**Problem**: "Address already in use" error
-
-**Solution**:
-```bash
-# Find process using port 5000
-lsof -i :5000
-# Or on Windows
-netstat -ano | findstr :5000
-
-# Kill the process or change the port in app.py
-```
-
-## Security Notes
-
-- This application is designed for **local use only**
-- Do not expose to the internet without proper authentication
-- Be cautious with SVN credentials (use SSH keys when possible)
-- The application does not store any passwords
-
-## Performance Tips
-
-1. **Large Working Copies**: Scanning many externals may take time. Use auto-refresh sparingly.
-2. **Network**: Changelog fetching requires network access to SVN repository
-3. **Revision Ranges**: Smaller revision ranges load faster
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Icons are loaded from Font Awesome via CDN (`index.html`).
 
 ## License
 
-This project is licensed under the MIT License. See LICENSE file for details.
-
-## Changelog
-
-### Version 1.0.0 (2025-12-08)
-
-- Initial release
-- Dashboard with externals table
-- Changelog viewer with multiple formats
-- Copy to clipboard functionality
-- Settings management
-- Auto-refresh capability
-- Responsive design
-- Toast notifications
-
-## Support
-
-For issues, questions, or suggestions:
-
-1. Check the Troubleshooting section
-2. Review existing issues on GitHub
-3. Create a new issue with detailed information
-
-## Acknowledgments
-
-- Built with Flask and modern web technologies
-- Icons by Font Awesome
-- Inspired by TortoiseSVN
-
----
-
-**Made with ❤️ for SVN users who need quick access to external changelogs**
+MIT -- see [LICENSE](LICENSE).
