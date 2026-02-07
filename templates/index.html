@@ -256,9 +256,18 @@
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="truncateTortoiseMessages" checked>
-                            Truncate TortoiseSVN messages (first line or 240 chars)
+                            Truncate TortoiseSVN messages
                         </label>
-                        <small class="form-help">When enabled, TortoiseSVN format will show only the first line of commit messages, truncated to 240 characters</small>
+                        <small class="form-help">When enabled, TortoiseSVN format will collapse multi-line commit messages into a single line and truncate to the character limit below</small>
+                    </div>
+
+                    <div class="form-group" id="truncateLengthGroup">
+                        <label for="truncateLength">
+                            <i class="fas fa-text-width"></i> Truncation Character Limit
+                        </label>
+                        <input type="number" id="truncateLength" class="form-control"
+                               min="50" max="1000" value="240">
+                        <small class="form-help">Maximum characters for truncated TortoiseSVN messages (50-1000)</small>
                     </div>
 
                     <div class="form-actions">

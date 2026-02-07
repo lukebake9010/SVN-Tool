@@ -358,12 +358,13 @@ def api_log():
         # Parse XML
         logs = manager.parse_log_xml(xml_log)
 
-        # Get truncation setting from config (default: True)
+        # Get truncation settings from config
         config = load_config()
         truncate_messages = config.get('truncate_tortoise_messages', True)
+        truncate_length = config.get('truncate_length', 240)
 
         # Format according to requested type
-        formatted = manager.format_changelog(logs, format_type, truncate_messages)
+        formatted = manager.format_changelog(logs, format_type, truncate_messages, truncate_length)
 
         return jsonify({
             'success': True,
@@ -396,11 +397,12 @@ def api_format_log():
     manager = get_svn_manager()
 
     try:
-        # Get truncation setting from config (default: True)
+        # Get truncation settings from config
         config = load_config()
         truncate_messages = config.get('truncate_tortoise_messages', True)
+        truncate_length = config.get('truncate_length', 240)
 
-        formatted = manager.format_changelog(logs, format_type, truncate_messages)
+        formatted = manager.format_changelog(logs, format_type, truncate_messages, truncate_length)
 
         return jsonify({
             'success': True,
