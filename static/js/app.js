@@ -8,7 +8,7 @@ let externalsData = [];
 let filteredData = [];
 let currentSort = { column: 'name', ascending: true };
 let autoRefreshInterval = null;
-let currentChangelog = { logs: [], format: 'plain' };
+let currentChangelog = { logs: [], format: 'plain', url: '', oldRev: '', newRev: '', name: '' };
 let workingCopies = [];
 let activeWorkingCopyPath = null;
 let tortoiseSvnAvailable = false;
@@ -107,6 +107,11 @@ function setupEventListeners() {
     // Format select in changelog modal
     document.getElementById('formatSelect').addEventListener('change', function() {
         reformatChangelog(this.value);
+    });
+
+    // Refresh changelog button
+    document.getElementById('refreshChangelogBtn').addEventListener('click', function() {
+        refreshChangelog();
     });
 
     // Copy changelog button
@@ -656,6 +661,12 @@ async function viewChangelog(url, oldRev, newRev, name) {
     const revRangeElement = document.getElementById('changelogRevRange');
     const formatSelect = document.getElementById('formatSelect');
 
+    // Store parameters for refresh
+    currentChangelog.url = url;
+    currentChangelog.oldRev = oldRev;
+    currentChangelog.newRev = newRev;
+    currentChangelog.name = name;
+
     // Set format to user's default preference
     try {
         const configResponse = await fetch('/api/config');
@@ -685,7 +696,7 @@ async function viewChangelog(url, oldRev, newRev, name) {
         const data = await response.json();
 
         if (data.success) {
-            currentChangelog = { logs: data.logs, format: data.format };
+            currentChangelog = { logs: data.logs, format: data.format, url: url, oldRev: oldRev, newRev: newRev, name: name };
             displayChangelog(data.logs, data.formatted);
         } else {
             throw new Error(data.error || 'Failed to load changelog');
@@ -792,6 +803,98 @@ async function copyChangelog() {
     } catch (error) {
         console.error('Error copying to clipboard:', error);
         showToast('Failed to copy to clipboard', 'error');
+    }
+}
+
+/**
+ * Refresh the current changelog by re-reading external state from SVN
+ * and fetching the changelog with updated revision values.
+ */
+async function refreshChangelog() {
+    if (!currentChangelog.name) {
+        showToast('No changelog to refresh', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('refreshChangelogBtn');
+    const content = document.getElementById('changelogContent');
+    const formatSelect = document.getElementById('formatSelect');
+    const revRangeElement = document.getElementById('changelogRevRange');
+
+    // Disable button and show spinning icon
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
+
+    // Show loading in content area
+    content.innerHTML = `
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i> Re-reading externals and fetching changelog...
+        </div>
+    `;
+
+    try {
+        // Step 1: Re-read externals to get updated revision state
+        const externalsResponse = await fetch('/api/externals');
+        const externalsData = await externalsResponse.json();
+
+        if (!externalsData.success) {
+            throw new Error(externalsData.error || 'Failed to refresh externals');
+        }
+
+        // Step 2: Find the matching external by name and URL
+        const external = externalsData.externals.find(ext =>
+            ext.name === currentChangelog.name &&
+            ext.url === currentChangelog.url
+        );
+
+        if (!external) {
+            throw new Error(`External "${currentChangelog.name}" no longer found`);
+        }
+
+        // Step 3: Derive updated oldRev/newRev using the same logic as the table
+        let oldRev = external.revision;
+        let newRev = 'HEAD';
+
+        if (external.change_details && external.status === 'changed') {
+            if (external.change_details.revision) {
+                oldRev = external.change_details.revision.old;
+                newRev = external.change_details.revision.new;
+            }
+        }
+
+        // Step 4: Update stored parameters and revision display
+        currentChangelog.url = external.url;
+        currentChangelog.oldRev = oldRev;
+        currentChangelog.newRev = newRev;
+        revRangeElement.textContent = `r${oldRev}:${newRev}`;
+
+        // Step 5: Fetch the changelog with updated revisions
+        const format = formatSelect.value;
+        const logResponse = await fetch(`/api/log?url=${encodeURIComponent(external.url)}&old_rev=${oldRev}&new_rev=${newRev}&format=${format}`);
+        const logData = await logResponse.json();
+
+        if (logData.success) {
+            currentChangelog.logs = logData.logs;
+            currentChangelog.format = logData.format;
+            displayChangelog(logData.logs, logData.formatted);
+            showToast('Changelog refreshed', 'success');
+        } else {
+            throw new Error(logData.error || 'Failed to fetch changelog');
+        }
+
+    } catch (error) {
+        console.error('Error refreshing changelog:', error);
+        content.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error refreshing changelog: ${escapeHtml(error.message)}</p>
+            </div>
+        `;
+        showToast('Error refreshing changelog: ' + error.message, 'error');
+
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
     }
 }
 
