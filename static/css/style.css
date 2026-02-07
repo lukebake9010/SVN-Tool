@@ -343,7 +343,15 @@ body {
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
+
+/* Column widths: Name/Path + URL ≈ 75%, rest ≈ 25% */
+.data-table th:nth-child(1) { width: 30%; }  /* Name/Path */
+.data-table th:nth-child(2) { width: 7%; }   /* Revision */
+.data-table th:nth-child(3) { width: 38%; }  /* URL */
+.data-table th:nth-child(4) { width: 8%; }   /* Status */
+.data-table th:nth-child(5) { width: 17%; }  /* Actions */
 
 .data-table thead {
     background: var(--bg-tertiary);
@@ -398,23 +406,29 @@ body {
 .data-table td {
     padding: var(--spacing-md);
     vertical-align: middle;
+    overflow: hidden;
 }
 
 .data-table td:last-child {
     white-space: nowrap;
-    min-width: 10rem;
 }
 
 .external-name {
     font-weight: 500;
     color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .external-path {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .change-details {
@@ -459,7 +473,6 @@ body {
 }
 
 .external-url {
-    max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
