@@ -561,7 +561,7 @@ function renderTable() {
         if (hasRevisionChange) {
             viewLogButton = `
                 <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(oldRev)}', '${escapeHtml(newRev)}', '${escapeHtml(external.name)}')">
-                    <i class="fas fa-list"></i> View Changes
+                    <i class="fas fa-list"></i> Changelog
                 </button>
             `;
         } else {

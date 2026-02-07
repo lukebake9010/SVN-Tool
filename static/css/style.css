@@ -400,6 +400,10 @@ body {
     vertical-align: middle;
 }
 
+.data-table td:last-child {
+    white-space: nowrap;
+}
+
 .external-name {
     font-weight: 500;
     color: var(--text-primary);
