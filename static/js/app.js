@@ -441,6 +441,67 @@ async function loadExternals() {
 }
 
 /**
+ * Build a grouped list of externals where nested externals appear right after their parent.
+ * Top-level externals are sorted by the current sort column; nested children follow their parent.
+ */
+function buildGroupedList(data) {
+    const sortFn = (a, b) => {
+        const aVal = a[currentSort.column] || '';
+        const bVal = b[currentSort.column] || '';
+        if (currentSort.ascending) {
+            return aVal.toString().localeCompare(bVal.toString());
+        } else {
+            return bVal.toString().localeCompare(aVal.toString());
+        }
+    };
+
+    // Separate top-level and nested externals
+    const topLevel = [];
+    const childrenMap = {}; // parent_external path -> [children]
+
+    for (const ext of data) {
+        if (!ext.depth || !ext.parent_external) {
+            topLevel.push(ext);
+        } else {
+            if (!childrenMap[ext.parent_external]) {
+                childrenMap[ext.parent_external] = [];
+            }
+            childrenMap[ext.parent_external].push(ext);
+        }
+    }
+
+    // Sort top-level externals
+    topLevel.sort(sortFn);
+
+    // Build final list: each parent followed by its sorted children (recursively)
+    const result = [];
+    const added = new Set();
+
+    function addWithChildren(ext) {
+        result.push(ext);
+        added.add(ext.path);
+        const children = childrenMap[ext.path] || [];
+        children.sort(sortFn);
+        for (const child of children) {
+            addWithChildren(child);
+        }
+    }
+
+    for (const ext of topLevel) {
+        addWithChildren(ext);
+    }
+
+    // Append any orphaned nested externals (parent filtered out)
+    for (const ext of data) {
+        if (!added.has(ext.path)) {
+            result.push(ext);
+        }
+    }
+
+    return result;
+}
+
+/**
  * Render the externals table
  */
 function renderTable() {
@@ -457,17 +518,8 @@ function renderTable() {
         return;
     }
 
-    // Sort data
-    const sortedData = [...filteredData].sort((a, b) => {
-        const aVal = a[currentSort.column] || '';
-        const bVal = b[currentSort.column] || '';
-
-        if (currentSort.ascending) {
-            return aVal.toString().localeCompare(bVal.toString());
-        } else {
-            return bVal.toString().localeCompare(aVal.toString());
-        }
-    });
+    // Sort and group data (nested externals stay under their parent)
+    const sortedData = buildGroupedList(filteredData);
 
     // Render rows
     tableBody.innerHTML = sortedData.map(external => {
@@ -509,7 +561,7 @@ function renderTable() {
         if (hasRevisionChange) {
             viewLogButton = `
                 <button class="btn btn-sm btn-primary" onclick="viewChangelog('${escapeHtml(external.url)}', '${escapeHtml(oldRev)}', '${escapeHtml(newRev)}', '${escapeHtml(external.name)}')">
-                    <i class="fas fa-list"></i> View Changes
+                    <i class="fas fa-list"></i> Changelog
                 </button>
             `;
         } else {
@@ -535,10 +587,14 @@ function renderTable() {
             `;
         }
 
+        const depth = external.depth || 0;
+        const depthClass = depth > 0 ? ` nested-external nested-depth-${Math.min(depth, 3)}` : '';
+        const nestingIndicator = depth > 0 ? '<span class="nesting-indicator">\u21b3</span>' : '';
+
         return `
-            <tr class="external-row status-${statusClass}" data-path="${external.path}">
+            <tr class="external-row status-${statusClass}${depthClass}" data-path="${external.path}">
                 <td>
-                    <div class="external-name">${escapeHtml(external.name)}</div>
+                    <div class="external-name">${nestingIndicator}${escapeHtml(external.name)}</div>
                     <div class="external-path">${escapeHtml(external.path)}</div>
                     ${changeDetailsHTML}
                 </td>
