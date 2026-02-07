@@ -191,7 +191,6 @@ SVN-Tool/
 │       └── app.js              # Frontend logic
 ├── test_external_detection.py  # Change detection test script
 ├── debug_externals.py          # Debug/development utility
-├── QUICKSTART.md               # Quick start guide
 ├── CLAUDE.md                   # AI assistant guide
 └── LICENSE                     # MIT license
 ```
