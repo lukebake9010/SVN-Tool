@@ -723,6 +723,28 @@ body {
     cursor: pointer;
 }
 
+.changelog-options {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.changelog-option-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.changelog-option-label input[type="checkbox"] {
+    width: 0.9rem;
+    height: 0.9rem;
+    cursor: pointer;
+}
+
 .changelog-content {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);

@@ -109,6 +109,12 @@ function setupEventListeners() {
         reformatChangelog(this.value);
     });
 
+    // Exclude old revision toggle
+    document.getElementById('excludeOldRevToggle').addEventListener('change', function() {
+        saveExcludeOldRevPreference(this.checked);
+        reformatChangelog(document.getElementById('formatSelect').value);
+    });
+
     // Refresh changelog button
     document.getElementById('refreshChangelogBtn').addEventListener('click', function() {
         refreshChangelog();
@@ -672,13 +678,14 @@ async function viewChangelog(url, oldRev, newRev, name) {
     currentChangelog.newRev = newRev;
     currentChangelog.name = name;
 
-    // Set format to user's default preference
+    // Load user preferences
     try {
         const configResponse = await fetch('/api/config');
         const config = await configResponse.json();
         formatSelect.value = config.default_format || 'tortoise';
+        document.getElementById('excludeOldRevToggle').checked = config.exclude_old_revision || false;
     } catch (error) {
-        console.error('Error loading default format:', error);
+        console.error('Error loading preferences:', error);
     }
 
     // Open modal
@@ -702,7 +709,23 @@ async function viewChangelog(url, oldRev, newRev, name) {
 
         if (data.success) {
             currentChangelog = { logs: data.logs, format: data.format, url: url, oldRev: oldRev, newRev: newRev, name: name };
-            displayChangelog(data.logs, data.formatted);
+            // Re-format with filtered logs if excluding old revision
+            const filtered = getFilteredLogs();
+            if (filtered.length !== data.logs.length) {
+                const fmtResp = await fetch('/api/log/format', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logs: filtered, format: data.format })
+                });
+                const fmtData = await fmtResp.json();
+                if (fmtData.success) {
+                    displayChangelog(filtered, fmtData.formatted);
+                } else {
+                    displayChangelog(filtered, data.formatted);
+                }
+            } else {
+                displayChangelog(data.logs, data.formatted);
+            }
         } else {
             throw new Error(data.error || 'Failed to load changelog');
         }
@@ -716,6 +739,37 @@ async function viewChangelog(url, oldRev, newRev, name) {
             </div>
         `;
         showToast('Error loading changelog: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Get the logs to display, filtering out the old revision if the toggle is checked.
+ */
+function getFilteredLogs() {
+    const logs = currentChangelog.logs || [];
+    const excludeOldRev = document.getElementById('excludeOldRevToggle').checked;
+    if (excludeOldRev && logs.length > 0) {
+        const oldRev = String(currentChangelog.oldRev);
+        return logs.filter(log => String(log.revision) !== oldRev);
+    }
+    return logs;
+}
+
+/**
+ * Save exclude old revision preference to config.
+ */
+async function saveExcludeOldRevPreference(value) {
+    try {
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        config.exclude_old_revision = value;
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+    } catch (error) {
+        console.error('Error saving exclude old revision preference:', error);
     }
 }
 
@@ -755,11 +809,12 @@ async function reformatChangelog(format) {
     `;
 
     try {
+        const filtered = getFilteredLogs();
         const response = await fetch('/api/log/format', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                logs: currentChangelog.logs,
+                logs: filtered,
                 format: format
             })
         });
@@ -768,7 +823,7 @@ async function reformatChangelog(format) {
 
         if (data.success) {
             currentChangelog.format = data.format;
-            displayChangelog(currentChangelog.logs, data.formatted);
+            displayChangelog(filtered, data.formatted);
         } else {
             throw new Error(data.error || 'Failed to format changelog');
         }
@@ -881,7 +936,19 @@ async function refreshChangelog() {
         if (logData.success) {
             currentChangelog.logs = logData.logs;
             currentChangelog.format = logData.format;
-            displayChangelog(logData.logs, logData.formatted);
+            // Re-format with filtered logs if excluding old revision
+            const filtered = getFilteredLogs();
+            if (filtered.length !== logData.logs.length) {
+                const fmtResp = await fetch('/api/log/format', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logs: filtered, format: logData.format })
+                });
+                const fmtData = await fmtResp.json();
+                displayChangelog(filtered, fmtData.success ? fmtData.formatted : logData.formatted);
+            } else {
+                displayChangelog(logData.logs, logData.formatted);
+            }
             showToast('Changelog refreshed', 'success');
         } else {
             throw new Error(logData.error || 'Failed to fetch changelog');
