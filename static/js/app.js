@@ -32,6 +32,9 @@ function initializeApp() {
     // Load working copies
     loadWorkingCopies();
 
+    // Restore saved UI state from localStorage
+    restoreSavedState();
+
     // Load externals
     loadExternals();
 
@@ -382,7 +385,6 @@ async function loadExternals() {
 
         if (data.success) {
             externalsData = data.externals;
-            filteredData = [...externalsData];
 
             // Update last scan time
             const timestamp = new Date(data.timestamp);
@@ -392,7 +394,8 @@ async function loadExternals() {
                 tableBody.innerHTML = '';
                 emptyState.style.display = 'block';
             } else {
-                renderTable();
+                // Apply current filters (preserves filter state across refreshes)
+                filterExternals();
             }
 
             showToast(`Loaded ${data.count} external(s)`, 'success');
@@ -545,6 +548,44 @@ function renderTable() {
 }
 
 /**
+ * Save filter state to localStorage
+ */
+function saveFilterState() {
+    const filterState = {
+        searchTerm: document.getElementById('searchInput').value,
+        showModified: document.getElementById('filterModified').checked,
+        showClean: document.getElementById('filterClean').checked,
+        showError: document.getElementById('filterError').checked
+    };
+    localStorage.setItem('svnFilterState', JSON.stringify(filterState));
+}
+
+/**
+ * Restore all saved UI state from localStorage
+ */
+function restoreSavedState() {
+    restoreFilterState();
+}
+
+/**
+ * Restore filter state from localStorage
+ */
+function restoreFilterState() {
+    const saved = localStorage.getItem('svnFilterState');
+    if (!saved) return;
+
+    try {
+        const filterState = JSON.parse(saved);
+        document.getElementById('searchInput').value = filterState.searchTerm || '';
+        document.getElementById('filterModified').checked = filterState.showModified !== false;
+        document.getElementById('filterClean').checked = filterState.showClean !== false;
+        document.getElementById('filterError').checked = filterState.showError !== false;
+    } catch (e) {
+        console.error('Error restoring filter state:', e);
+    }
+}
+
+/**
  * Filter externals based on search and status filters
  */
 function filterExternals() {
@@ -569,6 +610,7 @@ function filterExternals() {
         return matchesSearch && matchesStatus;
     });
 
+    saveFilterState();
     renderTable();
 }
 
