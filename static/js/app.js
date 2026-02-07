@@ -104,6 +104,12 @@ function setupEventListeners() {
         intervalGroup.style.display = this.checked ? 'block' : 'none';
     });
 
+    // Truncate messages toggle - show/hide length input
+    document.getElementById('truncateTortoiseMessages').addEventListener('change', function() {
+        const truncateLengthGroup = document.getElementById('truncateLengthGroup');
+        truncateLengthGroup.style.display = this.checked ? 'block' : 'none';
+    });
+
     // Format select in changelog modal
     document.getElementById('formatSelect').addEventListener('change', function() {
         reformatChangelog(this.value);
@@ -1007,10 +1013,15 @@ async function loadSettingsForm() {
         document.getElementById('autoRefreshInterval').value = config.auto_refresh_interval || 60;
         document.getElementById('defaultFormat').value = config.default_format || 'tortoise';
         document.getElementById('truncateTortoiseMessages').checked = config.truncate_tortoise_messages !== false;
+        document.getElementById('truncateLength').value = config.truncate_length || 240;
 
         // Show/hide auto-refresh interval
         const intervalGroup = document.getElementById('autoRefreshIntervalGroup');
         intervalGroup.style.display = config.auto_refresh ? 'block' : 'none';
+
+        // Show/hide truncate length
+        const truncateLengthGroup = document.getElementById('truncateLengthGroup');
+        truncateLengthGroup.style.display = config.truncate_tortoise_messages !== false ? 'block' : 'none';
 
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -1025,7 +1036,8 @@ async function saveSettings() {
         auto_refresh: document.getElementById('autoRefreshToggle').checked,
         auto_refresh_interval: parseInt(document.getElementById('autoRefreshInterval').value),
         default_format: document.getElementById('defaultFormat').value,
-        truncate_tortoise_messages: document.getElementById('truncateTortoiseMessages').checked
+        truncate_tortoise_messages: document.getElementById('truncateTortoiseMessages').checked,
+        truncate_length: parseInt(document.getElementById('truncateLength').value) || 240
     };
 
     try {
