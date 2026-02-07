@@ -125,11 +125,16 @@ function setupEventListeners() {
         fetchManualLog();
     });
 
-    // Close modals on outside click
+    // Close modals on outside click, but not when dragging text off the modal
+    let modalMouseDownTarget = null;
+    window.addEventListener('mousedown', function(e) {
+        modalMouseDownTarget = e.target;
+    });
     window.addEventListener('click', function(e) {
-        if (e.target.classList.contains('modal')) {
+        if (e.target.classList.contains('modal') && modalMouseDownTarget === e.target) {
             e.target.style.display = 'none';
         }
+        modalMouseDownTarget = null;
     });
 
     // Track shift key for changing Properties button behavior
