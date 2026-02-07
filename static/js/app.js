@@ -8,7 +8,7 @@ let externalsData = [];
 let filteredData = [];
 let currentSort = { column: 'name', ascending: true };
 let autoRefreshInterval = null;
-let currentChangelog = { logs: [], format: 'plain' };
+let currentChangelog = { logs: [], format: 'plain', url: '', oldRev: '', newRev: '', name: '' };
 let workingCopies = [];
 let activeWorkingCopyPath = null;
 let tortoiseSvnAvailable = false;
@@ -107,6 +107,11 @@ function setupEventListeners() {
     // Format select in changelog modal
     document.getElementById('formatSelect').addEventListener('change', function() {
         reformatChangelog(this.value);
+    });
+
+    // Refresh changelog button
+    document.getElementById('refreshChangelogBtn').addEventListener('click', function() {
+        refreshChangelog();
     });
 
     // Copy changelog button
@@ -656,6 +661,12 @@ async function viewChangelog(url, oldRev, newRev, name) {
     const revRangeElement = document.getElementById('changelogRevRange');
     const formatSelect = document.getElementById('formatSelect');
 
+    // Store parameters for refresh
+    currentChangelog.url = url;
+    currentChangelog.oldRev = oldRev;
+    currentChangelog.newRev = newRev;
+    currentChangelog.name = name;
+
     // Set format to user's default preference
     try {
         const configResponse = await fetch('/api/config');
@@ -685,7 +696,7 @@ async function viewChangelog(url, oldRev, newRev, name) {
         const data = await response.json();
 
         if (data.success) {
-            currentChangelog = { logs: data.logs, format: data.format };
+            currentChangelog = { logs: data.logs, format: data.format, url: url, oldRev: oldRev, newRev: newRev, name: name };
             displayChangelog(data.logs, data.formatted);
         } else {
             throw new Error(data.error || 'Failed to load changelog');
@@ -792,6 +803,60 @@ async function copyChangelog() {
     } catch (error) {
         console.error('Error copying to clipboard:', error);
         showToast('Failed to copy to clipboard', 'error');
+    }
+}
+
+/**
+ * Refresh the current changelog by re-fetching from SVN
+ */
+async function refreshChangelog() {
+    if (!currentChangelog.url) {
+        showToast('No changelog to refresh', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('refreshChangelogBtn');
+    const content = document.getElementById('changelogContent');
+    const formatSelect = document.getElementById('formatSelect');
+
+    // Disable button and show spinning icon
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
+
+    // Show loading in content area
+    content.innerHTML = `
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i> Refreshing changelog...
+        </div>
+    `;
+
+    try {
+        const format = formatSelect.value;
+        const response = await fetch(`/api/log?url=${encodeURIComponent(currentChangelog.url)}&old_rev=${currentChangelog.oldRev}&new_rev=${currentChangelog.newRev}&format=${format}`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentChangelog.logs = data.logs;
+            currentChangelog.format = data.format;
+            displayChangelog(data.logs, data.formatted);
+            showToast('Changelog refreshed', 'success');
+        } else {
+            throw new Error(data.error || 'Failed to refresh changelog');
+        }
+
+    } catch (error) {
+        console.error('Error refreshing changelog:', error);
+        content.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error refreshing changelog: ${escapeHtml(error.message)}</p>
+            </div>
+        `;
+        showToast('Error refreshing changelog: ' + error.message, 'error');
+
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
     }
 }
 
