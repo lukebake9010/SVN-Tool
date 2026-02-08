@@ -13,6 +13,8 @@ let workingCopies = [];
 let activeWorkingCopyPath = null;
 let tortoiseSvnAvailable = false;
 let shiftKeyPressed = false;
+let tabStatuses = {};
+let tabStatusesLoading = false;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -29,8 +31,8 @@ function initializeApp() {
     // Check TortoiseSVN availability
     checkTortoiseSvnAvailability();
 
-    // Load working copies
-    loadWorkingCopies();
+    // Load working copies, then fetch tab statuses in background
+    loadWorkingCopies().then(() => loadTabStatuses());
 
     // Restore saved UI state from localStorage
     restoreSavedState();
@@ -95,7 +97,7 @@ function setupEventListeners() {
 
     // Refresh tabs button
     document.getElementById('refreshTabsBtn').addEventListener('click', function() {
-        loadWorkingCopies();
+        loadWorkingCopies().then(() => loadTabStatuses());
     });
 
     // Auto-refresh toggle
@@ -258,6 +260,48 @@ async function loadWorkingCopies() {
 }
 
 /**
+ * Load aggregate status for all working copy tabs
+ */
+async function loadTabStatuses() {
+    tabStatusesLoading = true;
+    renderWorkingCopyTabs();
+
+    try {
+        const response = await fetch('/api/working-copies/statuses');
+        const data = await response.json();
+
+        if (data.success) {
+            tabStatuses = data.statuses;
+        }
+    } catch (error) {
+        console.error('Error loading tab statuses:', error);
+    } finally {
+        tabStatusesLoading = false;
+        renderWorkingCopyTabs();
+    }
+}
+
+/**
+ * Compute aggregate status for the active working copy from loaded externals
+ */
+function updateActiveTabStatus() {
+    if (!activeWorkingCopyPath || externalsData.length === 0) return;
+
+    const hasError = externalsData.some(e => e.status === 'error' || e.status === 'missing');
+    const hasChanges = externalsData.some(e => e.status === 'changed' || e.status === 'new');
+
+    if (hasError) {
+        tabStatuses[activeWorkingCopyPath] = 'error';
+    } else if (hasChanges) {
+        tabStatuses[activeWorkingCopyPath] = 'changed';
+    } else {
+        tabStatuses[activeWorkingCopyPath] = 'clean';
+    }
+
+    renderWorkingCopyTabs();
+}
+
+/**
  * Render working copy tabs
  */
 function renderWorkingCopyTabs() {
@@ -280,12 +324,28 @@ function renderWorkingCopyTabs() {
     workingCopies.forEach(wc => {
         const tab = document.createElement('button');
         tab.className = 'tab-button';
-        tab.textContent = wc.name;
         tab.title = wc.path;
+
+        // Tab text
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = wc.name;
+        tab.appendChild(nameSpan);
 
         // Mark active tab
         if (wc.path === activeWorkingCopyPath) {
             tab.classList.add('active');
+        }
+
+        // Show loading spinner or status dot in top-right corner
+        const status = tabStatuses[wc.path];
+        if (status) {
+            const dot = document.createElement('span');
+            dot.className = 'tab-status-dot tab-status-' + status;
+            tab.appendChild(dot);
+        } else if (tabStatusesLoading) {
+            const spinner = document.createElement('i');
+            spinner.className = 'fas fa-spinner fa-spin tab-status-spinner';
+            tab.appendChild(spinner);
         }
 
         // Add click handler
@@ -421,6 +481,9 @@ async function loadExternals() {
             }
 
             showToast(`Loaded ${data.count} external(s)`, 'success');
+
+            // Update active tab status from loaded data
+            updateActiveTabStatus();
 
         } else {
             throw new Error(data.error || 'Failed to load externals');

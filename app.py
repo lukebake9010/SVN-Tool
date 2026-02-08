@@ -282,6 +282,41 @@ def api_activate_working_copy():
         }), 400
 
 
+@app.route('/api/working-copies/statuses')
+def api_working_copy_statuses():
+    """Get aggregate external status for all working copies."""
+    config = load_config()
+    projects_dir = config.get('projects_directory')
+
+    if not projects_dir:
+        return jsonify({'success': True, 'statuses': {}})
+
+    projects_dir = os.path.expanduser(projects_dir)
+    projects_dir = os.path.abspath(projects_dir)
+
+    working_copies = discover_working_copies(projects_dir)
+    statuses = {}
+
+    for wc in working_copies:
+        try:
+            temp_manager = SVNManager(wc['path'])
+            externals = temp_manager.get_externals()
+
+            has_error = any(e.get('status') in ('error', 'missing') for e in externals)
+            has_changes = any(e.get('status') in ('changed', 'new') for e in externals)
+
+            if has_error:
+                statuses[wc['path']] = 'error'
+            elif has_changes:
+                statuses[wc['path']] = 'changed'
+            else:
+                statuses[wc['path']] = 'clean'
+        except Exception:
+            statuses[wc['path']] = 'error'
+
+    return jsonify({'success': True, 'statuses': statuses})
+
+
 @app.route('/api/externals')
 def api_externals():
     """Get all SVN externals from the working copy."""
