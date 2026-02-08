@@ -195,6 +195,7 @@ body {
 }
 
 .tab-button {
+    position: relative;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -208,6 +209,14 @@ body {
     align-items: center;
     gap: var(--spacing-sm);
     min-height: 32px;
+}
+
+.tab-status-spinner {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    font-size: 0.5rem;
+    opacity: 0.5;
 }
 
 .tab-button:hover {

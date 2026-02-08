@@ -14,6 +14,7 @@ let activeWorkingCopyPath = null;
 let tortoiseSvnAvailable = false;
 let shiftKeyPressed = false;
 let tabStatuses = {};
+let tabStatusesLoading = false;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
@@ -262,16 +263,21 @@ async function loadWorkingCopies() {
  * Load aggregate status for all working copy tabs
  */
 async function loadTabStatuses() {
+    tabStatusesLoading = true;
+    renderWorkingCopyTabs();
+
     try {
         const response = await fetch('/api/working-copies/statuses');
         const data = await response.json();
 
         if (data.success) {
             tabStatuses = data.statuses;
-            renderWorkingCopyTabs();
         }
     } catch (error) {
         console.error('Error loading tab statuses:', error);
+    } finally {
+        tabStatusesLoading = false;
+        renderWorkingCopyTabs();
     }
 }
 
@@ -318,18 +324,26 @@ function renderWorkingCopyTabs() {
     workingCopies.forEach(wc => {
         const tab = document.createElement('button');
         tab.className = 'tab-button';
-        tab.textContent = wc.name;
         tab.title = wc.path;
+
+        // Tab text
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = wc.name;
+        tab.appendChild(nameSpan);
 
         // Mark active tab
         if (wc.path === activeWorkingCopyPath) {
             tab.classList.add('active');
         }
 
-        // Apply status class
+        // Apply status class or show loading spinner
         const status = tabStatuses[wc.path];
         if (status) {
             tab.classList.add('tab-status-' + status);
+        } else if (tabStatusesLoading) {
+            const spinner = document.createElement('i');
+            spinner.className = 'fas fa-spinner fa-spin tab-status-spinner';
+            tab.appendChild(spinner);
         }
 
         // Add click handler
