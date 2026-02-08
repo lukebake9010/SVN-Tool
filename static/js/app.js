@@ -336,10 +336,12 @@ function renderWorkingCopyTabs() {
             tab.classList.add('active');
         }
 
-        // Apply status class or show loading spinner
+        // Show loading spinner or status dot in top-right corner
         const status = tabStatuses[wc.path];
         if (status) {
-            tab.classList.add('tab-status-' + status);
+            const dot = document.createElement('span');
+            dot.className = 'tab-status-dot tab-status-' + status;
+            tab.appendChild(dot);
         } else if (tabStatusesLoading) {
             const spinner = document.createElement('i');
             spinner.className = 'fas fa-spinner fa-spin tab-status-spinner';
