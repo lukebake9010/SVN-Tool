@@ -22,6 +22,19 @@ class SVNManager:
         self.working_copy_path = working_copy_path or os.getcwd()
         self.svn_command = "svn"
 
+    @staticmethod
+    def _get_subprocess_flags() -> dict:
+        """Get platform-specific flags to suppress console windows on Windows."""
+        kwargs = {}
+        if hasattr(subprocess, 'CREATE_NO_WINDOW'):
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        if hasattr(subprocess, 'STARTUPINFO'):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
+            kwargs['startupinfo'] = startupinfo
+        return kwargs
+
     def set_working_copy(self, path: str) -> bool:
         """Set the working copy path."""
         if not os.path.exists(path):
@@ -38,7 +51,8 @@ class SVNManager:
                 [self.svn_command, "--version"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                **self._get_subprocess_flags()
             )
             return result.returncode == 0
         except (subprocess.SubprocessError, FileNotFoundError):
@@ -108,7 +122,8 @@ class SVNManager:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                cwd=cwd or self.working_copy_path
+                cwd=cwd or self.working_copy_path,
+                **self._get_subprocess_flags()
             )
 
             if result.returncode != 0:
@@ -520,7 +535,8 @@ class SVNManager:
                 capture_output=True,
                 text=True,
                 timeout=60,
-                cwd=self.working_copy_path
+                cwd=self.working_copy_path,
+                **self._get_subprocess_flags()
             )
 
             if result.returncode != 0:
@@ -636,7 +652,8 @@ class SVNManager:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                cwd=self.working_copy_path
+                cwd=self.working_copy_path,
+                **self._get_subprocess_flags()
             )
 
             if result.returncode != 0:
@@ -682,7 +699,7 @@ class SVNManager:
                 ["TortoiseProc.exe", "/command:about"],
                 capture_output=True,
                 timeout=5,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                **self._get_subprocess_flags()
             )
             return result.returncode == 0
 
@@ -772,7 +789,7 @@ class SVNManager:
             subprocess.Popen(
                 cmd_string,
                 shell=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                **self._get_subprocess_flags()
             )
 
             return True, "TortoiseSVN properties dialog opened successfully"
