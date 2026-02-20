@@ -19,5 +19,5 @@ if errorlevel 1 (
     echo Dependencies installed.
 )
 
-REM Launch tray app with pythonw (no console window)
-start "" pythonw tray_app.py
+REM Launch tray app with the venv's pythonw (no console window)
+start "" "%~dp0venv\Scripts\pythonw.exe" "%~dp0tray_app.py"
